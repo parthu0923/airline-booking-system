@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book a Hotel — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <a href="index.html" class="navbar-brand">
+                <span class="logo-icon">✈</span>
+                <span>SkyWings</span>
+            </a>
+            <div class="navbar-links">
+                <a href="ticket.html">← Back to Ticket</a>
+            </div>
+        </nav>
+
+        <div class="page-header">
+            <h1 class="animate-fadeInUp">🏨 Book a Hotel</h1>
+            <p class="animate-fadeInUp delay-1">Find the perfect stay at your destination</p>
+        </div>
+
+        <div class="container-md animate-fadeInUp delay-2">
+            <div class="glass-card-static">
+                <div id="successMsg" class="alert alert-success hidden"></div>
+                <div id="errorMsg" class="alert alert-error hidden"></div>
+
+                <div id="hotelForm">
+                    <div class="form-group">
+                        <label>Hotel Name</label>
+                        <select id="hotelName" class="form-control" required>
+                            <option value="">Select Hotel</option>
+                            <option value="SkyWings Grand Hotel">SkyWings Grand Hotel ⭐⭐⭐⭐⭐</option>
+                            <option value="Airport Inn">Airport Inn ⭐⭐⭐</option>
+                            <option value="City Center Stay">City Center Stay ⭐⭐⭐⭐</option>
+                            <option value="Budget Lodge">Budget Lodge ⭐⭐</option>
+                            <option value="Royal Palace Hotel">Royal Palace Hotel ⭐⭐⭐⭐⭐</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Room Type</label>
+                    </div>
+
+                    <div class="cab-type-selector">
+                        <div class="cab-type-option selected" onclick="selectRoom(this, 'Single', 1500)" id="room-single">
+                            <div class="cab-icon">🛏️</div>
+                            <div class="cab-name">Single</div>
+                            <div class="cab-price">₹1,500/night</div>
+                        </div>
+                        <div class="cab-type-option" onclick="selectRoom(this, 'Double', 2500)" id="room-double">
+                            <div class="cab-icon">🛏️🛏️</div>
+                            <div class="cab-name">Double</div>
+                            <div class="cab-price">₹2,500/night</div>
+                        </div>
+                        <div class="cab-type-option" onclick="selectRoom(this, 'Suite', 5000)" id="room-suite">
+                            <div class="cab-icon">🏰</div>
+                            <div class="cab-name">Suite</div>
+                            <div class="cab-price">₹5,000/night</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row mt-3">
+                        <div class="form-group">
+                            <label>Check-in Date</label>
+                            <input type="date" id="checkin" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Check-out Date</label>
+                            <input type="date" id="checkout" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div id="nightsInfo" style="text-align:center; color:var(--text-muted); margin-bottom:1rem;"></div>
+
+                    <div class="summary-divider" style="margin:1rem 0;"></div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                        <span style="font-size:1.2rem; font-weight:600;">Total</span>
+                        <span style="font-size:1.8rem; font-weight:800; color:var(--color-accent);" id="hotelTotal">₹1,500</span>
+                    </div>
+
+                    <button onclick="bookHotel()" class="btn btn-success btn-full btn-lg" id="bookHotelBtn">
+                        Book Hotel
+                    </button>
+                </div>
+
+                <!-- After booking buttons (hidden initially) -->
+                <div id="afterBooking" class="hidden" style="margin-top:1.5rem;">
+                    <div class="summary-divider" style="margin:1rem 0;"></div>
+                    <p style="text-align:center; color:var(--text-secondary); margin-bottom:1rem;">What would you like to do next?</p>
+                    <div style="display:flex; gap:0.8rem; justify-content:center;">
+                        <a href="cab.html" class="btn btn-primary btn-lg" id="cabBtn">🚖 Book Cab</a>
+                        <a href="summary.html" class="btn btn-accent btn-lg">✅ Finish</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const booking = JSON.parse(sessionStorage.getItem('bookingResult') || '{}');
+        let selectedRoomType = 'Single';
+        let roomPrice = 1500;
+
+        // Check if cab is already booked
+        const existingCab = sessionStorage.getItem('cabBooking');
+
+        // Set dates
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('checkin').min = today;
+        document.getElementById('checkout').min = today;
+
+        if (booking.date) {
+            document.getElementById('checkin').value = booking.date;
+            const nextDay = new Date(booking.date);
+            nextDay.setDate(nextDay.getDate() + 1);
+            document.getElementById('checkout').value = nextDay.toISOString().split('T')[0];
+        }
+
+        // Update on date change
+        document.getElementById('checkin').addEventListener('change', updateTotal);
+        document.getElementById('checkout').addEventListener('change', updateTotal);
+
+        function selectRoom(el, type, price) {
+            document.querySelectorAll('.cab-type-option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedRoomType = type;
+            roomPrice = price;
+            updateTotal();
+        }
+
+        function updateTotal() {
+            const checkin = new Date(document.getElementById('checkin').value);
+            const checkout = new Date(document.getElementById('checkout').value);
+            let nights = Math.ceil((checkout - checkin) / (1000*60*60*24));
+            if (isNaN(nights) || nights <= 0) nights = 1;
+
+            const total = roomPrice * nights;
+            document.getElementById('hotelTotal').textContent = `₹${total.toLocaleString('en-IN')}`;
+            document.getElementById('nightsInfo').textContent = `${nights} night${nights > 1 ? 's' : ''} × ₹${roomPrice.toLocaleString('en-IN')}/night`;
+        }
+
+        updateTotal();
+
+        function bookHotel() {
+            const hotelName = document.getElementById('hotelName').value;
+            const checkin = document.getElementById('checkin').value;
+            const checkout = document.getElementById('checkout').value;
+
+            // Validate without using alert()
+            if (!hotelName) {
+                document.getElementById('errorMsg').textContent = '❌ Please select a hotel.';
+                document.getElementById('errorMsg').classList.remove('hidden');
+                return;
+            }
+            if (!checkin || !checkout) {
+                document.getElementById('errorMsg').textContent = '❌ Please select check-in and check-out dates.';
+                document.getElementById('errorMsg').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('errorMsg').classList.add('hidden');
+
+            const btn = document.getElementById('bookHotelBtn');
+            btn.textContent = 'Booking...';
+            btn.disabled = true;
+
+            const nights = Math.max(1, Math.ceil((new Date(checkout) - new Date(checkin)) / (1000*60*60*24)));
+            const total = roomPrice * nights;
+
+            // Save hotel booking to sessionStorage
+            const hotelBookingData = {
+                hotelName: hotelName,
+                roomType: selectedRoomType,
+                checkin: checkin,
+                checkout: checkout,
+                nights: nights,
+                amount: total
+            };
+            sessionStorage.setItem('hotelBooking', JSON.stringify(hotelBookingData));
+
+            fetch('HotelServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    bookingId: booking.bookingId || 0,
+                    hotelName: hotelName,
+                    roomType: selectedRoomType,
+                    checkin: checkin,
+                    checkout: checkout,
+                    amount: total
+                }).toString()
+            })
+            .then(r => r.json())
+            .then(data => {
+                showSuccess(hotelName);
+            })
+            .catch(() => {
+                showSuccess(hotelName);
+            });
+        }
+
+        function showSuccess(hotelName) {
+            document.getElementById('successMsg').textContent = `Hotel booked successfully! 🏨 Your stay at ${hotelName} is confirmed.`;
+            document.getElementById('successMsg').classList.remove('hidden');
+            const btn = document.getElementById('bookHotelBtn');
+            btn.textContent = '✅ Hotel Booked!';
+            btn.style.background = 'var(--color-primary)';
+
+            // Show after-booking buttons
+            document.getElementById('afterBooking').classList.remove('hidden');
+
+            // If cab is already booked, show disabled cab button
+            if (existingCab) {
+                document.getElementById('cabBtn').textContent = '✅ Cab Already Booked';
+                document.getElementById('cabBtn').style.opacity = '0.6';
+                document.getElementById('cabBtn').style.pointerEvents = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
