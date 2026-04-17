@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Results — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <a href="index.html" class="navbar-brand">
+                <span class="logo-icon">✈</span>
+                <span>SkyWings</span>
+            </a>
+            <div class="navbar-links">
+                <a href="flightsearch.html">← New Search</a>
+                <a href="index.html" onclick="sessionStorage.clear();">Logout</a>
+            </div>
+        </nav>
+
+        <div class="page-header">
+            <h1 id="routeTitle" class="animate-fadeInUp">Flights</h1>
+            <p id="searchInfo" class="animate-fadeInUp delay-1"></p>
+        </div>
+
+        <div class="container">
+            <!-- Sort Options -->
+            <div class="flex justify-between items-center mb-3 flex-wrap gap-2 animate-fadeInUp delay-1">
+                <div id="flightCount" style="color: var(--text-muted);"></div>
+                <div class="flex gap-1">
+                    <button class="btn btn-outline btn-sm" onclick="sortFlights('price')">💰 Price</button>
+                    <button class="btn btn-outline btn-sm" onclick="sortFlights('duration')">⏱️ Duration</button>
+                    <button class="btn btn-outline btn-sm" onclick="sortFlights('departure')">🕐 Departure</button>
+                </div>
+            </div>
+
+
+
+            <!-- Flight Results -->
+            <div id="flightResults" class="flight-results animate-fadeInUp delay-2">
+                <div class="loading-overlay">
+                    <div class="spinner"></div>
+                    <p>Searching for the best flights...</p>
+                </div>
+            </div>
+
+            <!-- Connecting Flights Section -->
+            <div id="connectingSection" class="hidden mt-4">
+                <h3 style="color: var(--text-secondary); margin-bottom: 1rem;">🔗 Connecting Flights</h3>
+                <div id="connectingResults" class="flight-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const from = params.get('from');
+        const to = params.get('to');
+        const date = params.get('date');
+        const passengers = parseInt(params.get('passengers')) || 1;
+        const seatClass = params.get('seatClass') || 'economy';
+
+        // Set page title
+        document.getElementById('routeTitle').textContent = `${from} → ${to}`;
+        const dateObj = new Date(date);
+        const dateStr = dateObj.toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+        document.getElementById('searchInfo').textContent =
+            `${dateStr} • ${passengers} Passenger${passengers > 1 ? 's' : ''} • ${seatClass.charAt(0).toUpperCase() + seatClass.slice(1)} Class`;
+
+        let allFlights = [];
+
+        // Load flights
+        function loadFlights() {
+            fetch(`FlightServlet?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}&seatClass=${seatClass}`)
+                .then(r => r.json())
+                .then(data => {
+                    allFlights = data.flights || [];
+                    const connecting = data.connecting || [];
+
+                    if (allFlights.length === 0 && connecting.length === 0) {
+                        document.getElementById('flightResults').innerHTML = `
+                            <div class="glass-card-static text-center" style="padding:4rem 2rem;">
+                                <div style="font-size:4rem; margin-bottom:1rem;">✈️</div>
+                                <h3>No flights found</h3>
+                                <p style="color: var(--text-muted); margin-top:0.5rem;">Try different dates or cities</p>
+                                <a href="flightsearch.html" class="btn btn-primary mt-3">Search Again</a>
+                            </div>`;
+                        return;
+                    }
+
+
+
+                    renderFlights(allFlights);
+
+                    // Render connecting flights
+                    if (connecting.length > 0) {
+                        document.getElementById('connectingSection').classList.remove('hidden');
+                        renderConnecting(connecting);
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('flightResults').innerHTML = `
+                        <div class="alert alert-error">❌ Failed to load flights. Make sure the server is running.</div>`;
+                });
+        }
+
+        function renderFlights(flights) {
+            document.getElementById('flightCount').textContent = `${flights.length} flight${flights.length !== 1 ? 's' : ''} found`;
+
+            let html = '';
+            flights.forEach((f, i) => {
+
+
+                html += `
+                <div class="flight-card" onclick="selectFlight(${i})" id="flight-${i}">
+                    <div class="flight-airline">
+                        <div class="airline-logo">${f.airline.substring(0,2)}</div>
+                        <div>
+                            <div class="airline-name">${f.airline}</div>
+                            <div class="flight-number">${f.flightNumber} • ${f.aircraft}</div>
+                        </div>
+                    </div>
+
+                    <div class="flight-time-block">
+                        <div class="flight-time">${f.departureTime}</div>
+                        <div class="flight-city">${from}</div>
+                    </div>
+
+                    <div class="flight-duration">
+                        <div class="duration-time">${Math.floor(f.duration/60)}h ${f.duration%60}m</div>
+                        <div class="duration-line"></div>
+                        <div class="flight-stops">Non-stop</div>
+                    </div>
+
+                    <div class="flight-time-block">
+                        <div class="flight-time">${f.arrivalTime}</div>
+                        <div class="flight-city">${to}</div>
+                    </div>
+
+                    <div class="flight-price-section">
+                        <div class="flight-price">₹${Number(f.price).toLocaleString('en-IN')}</div>
+                        <div class="flight-price-label">per person</div>
+
+                    </div>
+                </div>`;
+            });
+
+            document.getElementById('flightResults').innerHTML = html;
+        }
+
+        function renderConnecting(connections) {
+            let html = '';
+            connections.forEach((c, i) => {
+                html += `
+                <div class="flight-card" onclick="selectConnecting(${i})" style="border-left: 3px solid var(--color-accent);">
+                    <div class="flight-airline">
+                        <div class="airline-logo" style="border-color: var(--color-accent);">🔗</div>
+                        <div>
+                            <div class="airline-name">${c.routeName}</div>
+                            <div class="flight-number">${c.flight1Number} + ${c.flight2Number}</div>
+                            <div class="connecting-badge mt-1">Layover: ${c.layoverMins} min</div>
+                        </div>
+                    </div>
+
+                    <div class="flight-time-block">
+                        <div class="flight-time">${c.departureTime}</div>
+                        <div class="flight-city">${from}</div>
+                    </div>
+
+                    <div class="flight-duration">
+                        <div class="duration-time">${Math.floor(c.totalDuration/60)}h ${c.totalDuration%60}m</div>
+                        <div class="duration-line"></div>
+                        <div class="flight-stops" style="color: var(--color-accent);">1 Stop — via ${c.via}</div>
+                    </div>
+
+                    <div class="flight-time-block">
+                        <div class="flight-time">${c.arrivalTime}</div>
+                        <div class="flight-city">${to}</div>
+                    </div>
+
+                    <div class="flight-price-section">
+                        <div class="flight-price">₹${Number(c.price).toLocaleString('en-IN')}</div>
+                        <div class="flight-price-label">per person</div>
+                        <div class="badge badge-success mt-1">${c.discount}% off</div>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('connectingResults').innerHTML = html;
+        }
+
+        function selectFlight(index) {
+            // Remove previous selection
+            document.querySelectorAll('.flight-card').forEach(c => c.classList.remove('selected'));
+            document.getElementById(`flight-${index}`).classList.add('selected');
+
+            const flight = allFlights[index];
+            const bookingData = {
+                flightId: flight.id,
+                flightNumber: flight.flightNumber,
+                airline: flight.airline,
+                from: from,
+                to: to,
+                date: date,
+                departureTime: flight.departureTime,
+                arrivalTime: flight.arrivalTime,
+                duration: flight.duration,
+                price: flight.price,
+                seatClass: seatClass,
+                passengers: passengers,
+                aircraft: flight.aircraft
+            };
+            sessionStorage.setItem('selectedFlight', JSON.stringify(bookingData));
+
+            setTimeout(() => { window.location.href = 'passenger.html'; }, 300);
+        }
+
+        function selectConnecting(index) {
+            // Handle connecting flight selection
+            window.location.href = 'passenger.html';
+        }
+
+        function sortFlights(by) {
+            const sorted = [...allFlights];
+            if (by === 'price') sorted.sort((a,b) => a.price - b.price);
+            if (by === 'duration') sorted.sort((a,b) => a.duration - b.duration);
+            if (by === 'departure') sorted.sort((a,b) => a.departureTime.localeCompare(b.departureTime));
+            allFlights = sorted;
+            renderFlights(sorted);
+        }
+
+        // Load on page load
+        loadFlights();
+    </script>
+</body>
+</html>

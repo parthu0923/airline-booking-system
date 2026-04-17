@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extras Payment — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <a href="index.html" class="navbar-brand">
+                <span class="logo-icon">✈</span>
+                <span>SkyWings</span>
+            </a>
+            <div class="navbar-links">
+                <a href="ticket.html">← Back to Ticket</a>
+            </div>
+        </nav>
+
+        <div class="page-header">
+            <h1 class="animate-fadeInUp">Extras Payment</h1>
+            <p class="animate-fadeInUp delay-1">Complete payment for your additional bookings</p>
+        </div>
+
+        <div class="container" style="max-width:900px;">
+            <div class="payment-layout animate-fadeInUp delay-2">
+
+                <!-- Payment Form -->
+                <div>
+                    <div class="glass-card-static">
+                        <h3 style="margin-bottom:1.5rem;">📱 UPI Payment</h3>
+
+                        <div id="errorMsg" class="alert alert-error hidden"></div>
+
+                        <!-- No extras message -->
+                        <div id="noExtrasMsg" class="hidden" style="text-align:center; padding:2rem;">
+                            <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
+                            <h3>No Additional Bookings</h3>
+                            <p style="color:var(--text-muted); margin-top:0.5rem;">You haven't booked any cab or hotel extras.</p>
+                            <a href="summary.html" class="btn btn-primary btn-lg mt-3">View Summary</a>
+                        </div>
+
+                        <!-- Payment form (shown if extras exist) -->
+                        <div id="paymentFormSection">
+                            <div class="form-group">
+                                <label>Your Name</label>
+                                <input type="text" id="payerName" class="form-control" placeholder="Enter your full name" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>UPI ID</label>
+                                <input type="text" id="upiId" class="form-control" placeholder="yourname@upi" required>
+                            </div>
+
+                            <div class="summary-divider" style="margin:1.5rem 0;"></div>
+
+                            <button onclick="processExtrasPayment()" class="btn btn-accent btn-full btn-lg" id="payBtn">
+                                Pay ₹<span id="payAmount">0</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extras Summary -->
+                <div>
+                    <div class="flight-summary-sidebar">
+                        <h4 style="margin-bottom:1rem; color:var(--color-primary);">📋 Extras Summary</h4>
+
+                        <!-- Flight Info (already paid) -->
+                        <div class="summary-item" style="opacity:0.6;">
+                            <span class="label">Flight</span>
+                            <span class="value" id="summFlight">Paid ✅</span>
+                        </div>
+
+                        <div class="summary-divider"></div>
+
+                        <!-- Cab Details -->
+                        <div id="cabSummarySection" class="hidden">
+                            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">🚖 Cab Booking</div>
+                            <div class="summary-item">
+                                <span class="label">Cab Type</span>
+                                <span class="value" id="summCabType"></span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Route</span>
+                                <span class="value" id="summCabRoute" style="font-size:0.8rem;"></span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Cab Amount</span>
+                                <span class="value" id="summCabAmount" style="color:var(--color-accent); font-weight:700;"></span>
+                            </div>
+                            <div class="summary-divider"></div>
+                        </div>
+
+                        <!-- Hotel Details -->
+                        <div id="hotelSummarySection" class="hidden">
+                            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">🏨 Hotel Booking</div>
+                            <div class="summary-item">
+                                <span class="label">Hotel</span>
+                                <span class="value" id="summHotelName"></span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Room</span>
+                                <span class="value" id="summHotelRoom"></span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Nights</span>
+                                <span class="value" id="summHotelNights"></span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Hotel Amount</span>
+                                <span class="value" id="summHotelAmount" style="color:var(--color-accent); font-weight:700;"></span>
+                            </div>
+                            <div class="summary-divider"></div>
+                        </div>
+
+                        <!-- Total -->
+                        <div class="price-breakdown">
+                            <div class="price-breakdown-item total">
+                                <span>Total Extras</span>
+                                <span class="value" id="totalExtras">₹0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const booking = JSON.parse(sessionStorage.getItem('bookingResult') || '{}');
+        const cabBooking = JSON.parse(sessionStorage.getItem('cabBooking') || 'null');
+        const hotelBooking = JSON.parse(sessionStorage.getItem('hotelBooking') || 'null');
+
+        if (!booking.pnr) {
+            window.location.href = 'flightsearch.html';
+        }
+
+        // Flight info
+        document.getElementById('summFlight').textContent = `${booking.flightNumber} — Paid ✅`;
+
+        let totalExtras = 0;
+
+        // Check if no extras at all
+        if (!cabBooking && !hotelBooking) {
+            document.getElementById('noExtrasMsg').classList.remove('hidden');
+            document.getElementById('paymentFormSection').classList.add('hidden');
+        }
+
+        // Cab details
+        if (cabBooking) {
+            document.getElementById('cabSummarySection').classList.remove('hidden');
+            document.getElementById('summCabType').textContent = cabBooking.cabType;
+            document.getElementById('summCabRoute').textContent = `${cabBooking.pickup} → ${cabBooking.drop}`;
+            document.getElementById('summCabAmount').textContent = `₹${cabBooking.amount.toLocaleString('en-IN')}`;
+            totalExtras += cabBooking.amount;
+        }
+
+        // Hotel details
+        if (hotelBooking) {
+            document.getElementById('hotelSummarySection').classList.remove('hidden');
+            document.getElementById('summHotelName').textContent = hotelBooking.hotelName;
+            document.getElementById('summHotelRoom').textContent = hotelBooking.roomType;
+            document.getElementById('summHotelNights').textContent = hotelBooking.nights;
+            document.getElementById('summHotelAmount').textContent = `₹${hotelBooking.amount.toLocaleString('en-IN')}`;
+            totalExtras += hotelBooking.amount;
+        }
+
+        // Update totals
+        document.getElementById('totalExtras').textContent = `₹${totalExtras.toLocaleString('en-IN')}`;
+        document.getElementById('payAmount').textContent = totalExtras.toLocaleString('en-IN');
+
+        function processExtrasPayment() {
+            const payerName = document.getElementById('payerName').value;
+            const upiId = document.getElementById('upiId').value;
+
+            if (!payerName || !upiId) {
+                document.getElementById('errorMsg').textContent = '❌ Please enter your name and UPI ID.';
+                document.getElementById('errorMsg').classList.remove('hidden');
+                return;
+            }
+
+            if (!upiId.includes('@')) {
+                document.getElementById('errorMsg').textContent = '❌ Please enter a valid UPI ID (e.g. yourname@upi).';
+                document.getElementById('errorMsg').classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('payBtn');
+            btn.textContent = 'Processing payment...';
+            btn.disabled = true;
+            document.getElementById('errorMsg').classList.add('hidden');
+
+            // Simulate payment processing
+            setTimeout(() => {
+                // Mark extras as paid
+                sessionStorage.setItem('extrasPaid', 'true');
+                window.location.href = 'summary.html';
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
