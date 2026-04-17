@@ -507,14 +507,17 @@ async function initializeData() {
         );
     } catch(e) { /* index may already exist */ }
 
-    // Check if data already exists
     const flightCount = await db.collection('flights').countDocuments();
-    if (flightCount > 0) {
+    const cfCount_check = await db.collection('connecting_flights').countDocuments();
+    if (flightCount >= 53 && cfCount_check >= 6) {
         console.log('Data already initialized. Skipping seed.');
         return;
     }
 
-    console.log('Seeding sample data...');
+    // Drop old data to re-seed cleanly
+    console.log('Seeding sample data (clearing old data first)...');
+    try { await db.collection('flights').drop(); } catch(e) { /* may not exist */ }
+    try { await db.collection('connecting_flights').drop(); } catch(e) { /* may not exist */ }
 
     // Initialize counters
     const counters = ['users', 'flights', 'bookings', 'passengers', 'cab_bookings', 'hotel_bookings', 'connecting_flights'];
@@ -526,10 +529,12 @@ async function initializeData() {
     }
 
     // Seed Users
-    await db.collection('users').insertMany([
-        { id: 1, username: 'admin', password: 'admin123', email: 'admin@skywings.com', phone: '9999999999', created_at: new Date() },
-        { id: 2, username: 'user1', password: 'pass123', email: 'user1@gmail.com', phone: '9876543210', created_at: new Date() }
-    ]);
+    try {
+        await db.collection('users').insertMany([
+            { id: 1, username: 'admin', password: 'admin123', email: 'admin@skywings.com', phone: '9999999999', created_at: new Date() },
+            { id: 2, username: 'user1', password: 'pass123', email: 'user1@gmail.com', phone: '9876543210', created_at: new Date() }
+        ]);
+    } catch(e) { /* users may already exist */ }
 
     // Seed Flights
     function flight(id, num, airline, src, dest, dep, arr, dur, eco, biz, aircraft) {
@@ -539,105 +544,108 @@ async function initializeData() {
                  total_seats: 180, aircraft, status: 'active' };
     }
 
-    await db.collection('flights').insertMany([
-        // Delhi to Mumbai
-        flight(1, '6E-2001', 'IndiGo', 'Delhi', 'Mumbai', '06:00', '08:10', 130, 3500, 8500, 'Airbus A320'),
-        flight(2, 'AI-101', 'Air India', 'Delhi', 'Mumbai', '09:30', '11:45', 135, 4200, 11000, 'Boeing 737'),
-        flight(3, 'SG-401', 'SpiceJet', 'Delhi', 'Mumbai', '14:00', '16:15', 135, 2800, 7200, 'Boeing 737 MAX'),
-        // Mumbai to Delhi
-        flight(4, '6E-2002', 'IndiGo', 'Mumbai', 'Delhi', '07:00', '09:10', 130, 3500, 8500, 'Airbus A320'),
-        flight(5, 'AI-102', 'Air India', 'Mumbai', 'Delhi', '12:00', '14:15', 135, 4200, 11000, 'Boeing 737'),
-        flight(6, 'SG-402', 'SpiceJet', 'Mumbai', 'Delhi', '18:00', '20:15', 135, 2800, 7200, 'Boeing 737 MAX'),
-        // Mumbai to Bangalore
-        flight(7, '6E-3001', 'IndiGo', 'Mumbai', 'Bangalore', '08:00', '09:45', 105, 3200, 7800, 'Airbus A320'),
-        flight(8, 'UK-801', 'Vistara', 'Mumbai', 'Bangalore', '11:00', '12:50', 110, 5500, 13000, 'Airbus A320neo'),
-        flight(9, 'SG-501', 'SpiceJet', 'Mumbai', 'Bangalore', '16:30', '18:20', 110, 2600, 6500, 'Boeing 737'),
-        // Bangalore to Mumbai
-        flight(10, '6E-3002', 'IndiGo', 'Bangalore', 'Mumbai', '06:30', '08:15', 105, 3200, 7800, 'Airbus A320'),
-        flight(11, 'UK-802', 'Vistara', 'Bangalore', 'Mumbai', '14:00', '15:50', 110, 5500, 13000, 'Airbus A320neo'),
-        // Delhi to Bangalore
-        flight(12, 'AI-501', 'Air India', 'Delhi', 'Bangalore', '07:00', '09:45', 165, 5200, 14000, 'Boeing 787'),
-        flight(13, '6E-4001', 'IndiGo', 'Delhi', 'Bangalore', '13:00', '15:50', 170, 4800, 12000, 'Airbus A321'),
-        // Bangalore to Delhi
-        flight(14, 'AI-502', 'Air India', 'Bangalore', 'Delhi', '10:00', '12:45', 165, 5200, 14000, 'Boeing 787'),
-        flight(15, '6E-4002', 'IndiGo', 'Bangalore', 'Delhi', '17:00', '19:50', 170, 4800, 12000, 'Airbus A321'),
-        // Bangalore to Chennai
-        flight(16, '6E-5001', 'IndiGo', 'Bangalore', 'Chennai', '08:00', '09:00', 60, 2200, 5500, 'ATR 72'),
-        flight(17, 'AI-301', 'Air India', 'Bangalore', 'Chennai', '15:00', '16:00', 60, 2800, 7000, 'Airbus A320'),
-        // Chennai to Bangalore
-        flight(18, '6E-5002', 'IndiGo', 'Chennai', 'Bangalore', '10:00', '11:00', 60, 2200, 5500, 'ATR 72'),
-        flight(19, 'AI-302', 'Air India', 'Chennai', 'Bangalore', '17:00', '18:00', 60, 2800, 7000, 'Airbus A320'),
-        // Hyderabad to Delhi
-        flight(20, '6E-6001', 'IndiGo', 'Hyderabad', 'Delhi', '06:00', '08:15', 135, 3800, 9500, 'Airbus A320'),
-        flight(21, 'SG-601', 'SpiceJet', 'Hyderabad', 'Delhi', '11:00', '13:20', 140, 3000, 7500, 'Boeing 737'),
-        // Delhi to Hyderabad
-        flight(22, '6E-6002', 'IndiGo', 'Delhi', 'Hyderabad', '09:00', '11:15', 135, 3800, 9500, 'Airbus A320'),
-        flight(23, 'SG-602', 'SpiceJet', 'Delhi', 'Hyderabad', '16:00', '18:20', 140, 3000, 7500, 'Boeing 737'),
-        // Kolkata to Delhi
-        flight(24, 'AI-201', 'Air India', 'Kolkata', 'Delhi', '07:00', '09:30', 150, 4500, 11500, 'Boeing 737'),
-        flight(25, '6E-7001', 'IndiGo', 'Kolkata', 'Delhi', '14:00', '16:30', 150, 3600, 9000, 'Airbus A320'),
-        // Delhi to Kolkata
-        flight(26, 'AI-202', 'Air India', 'Delhi', 'Kolkata', '10:00', '12:30', 150, 4500, 11500, 'Boeing 737'),
-        flight(27, '6E-7002', 'IndiGo', 'Delhi', 'Kolkata', '17:00', '19:30', 150, 3600, 9000, 'Airbus A320'),
-        // Hyderabad to Mumbai
-        flight(28, '6E-8001', 'IndiGo', 'Hyderabad', 'Mumbai', '07:30', '09:00', 90, 3000, 7500, 'Airbus A320'),
-        flight(29, 'AI-401', 'Air India', 'Hyderabad', 'Mumbai', '14:00', '15:30', 90, 3500, 8500, 'Boeing 737'),
-        // Mumbai to Hyderabad
-        flight(30, '6E-8002', 'IndiGo', 'Mumbai', 'Hyderabad', '08:00', '09:30', 90, 3000, 7500, 'Airbus A320'),
-        flight(31, 'AI-402', 'Air India', 'Mumbai', 'Hyderabad', '16:00', '17:30', 90, 3500, 8500, 'Boeing 737'),
-        // Hyderabad to Bangalore
-        flight(32, '6E-9001', 'IndiGo', 'Hyderabad', 'Bangalore', '06:30', '07:45', 75, 2800, 7000, 'Airbus A320'),
-        flight(33, 'SG-701', 'SpiceJet', 'Hyderabad', 'Bangalore', '13:00', '14:15', 75, 2400, 6000, 'Boeing 737'),
-        // Bangalore to Hyderabad
-        flight(34, '6E-9002', 'IndiGo', 'Bangalore', 'Hyderabad', '09:00', '10:15', 75, 2800, 7000, 'Airbus A320'),
-        flight(35, 'SG-702', 'SpiceJet', 'Bangalore', 'Hyderabad', '16:00', '17:15', 75, 2400, 6000, 'Boeing 737'),
-        // Chennai to Delhi
-        flight(36, 'AI-601', 'Air India', 'Chennai', 'Delhi', '06:00', '08:50', 170, 5000, 13000, 'Boeing 787'),
-        flight(37, '6E-1001', 'IndiGo', 'Chennai', 'Delhi', '14:00', '16:50', 170, 4500, 11500, 'Airbus A321'),
-        // Delhi to Chennai
-        flight(38, 'AI-602', 'Air India', 'Delhi', 'Chennai', '08:00', '10:50', 170, 5000, 13000, 'Boeing 787'),
-        flight(39, '6E-1002', 'IndiGo', 'Delhi', 'Chennai', '15:00', '17:50', 170, 4500, 11500, 'Airbus A321'),
-        // Chennai to Hyderabad
-        flight(40, '6E-1101', 'IndiGo', 'Chennai', 'Hyderabad', '08:00', '09:15', 75, 2600, 6500, 'Airbus A320'),
-        // Hyderabad to Chennai
-        flight(41, 'SG-801', 'SpiceJet', 'Hyderabad', 'Chennai', '10:00', '11:15', 75, 2600, 6500, 'Boeing 737'),
-        // Mumbai to Chennai
-        flight(42, 'AI-701', 'Air India', 'Mumbai', 'Chennai', '07:00', '09:00', 120, 3800, 9500, 'Boeing 737'),
-        flight(43, '6E-1201', 'IndiGo', 'Mumbai', 'Chennai', '15:00', '17:00', 120, 3200, 8000, 'Airbus A320'),
-        // Chennai to Mumbai
-        flight(44, 'AI-702', 'Air India', 'Chennai', 'Mumbai', '09:00', '11:00', 120, 3800, 9500, 'Boeing 737'),
-        flight(45, '6E-1202', 'IndiGo', 'Chennai', 'Mumbai', '17:00', '19:00', 120, 3200, 8000, 'Airbus A320'),
-        // Kolkata to Mumbai
-        flight(46, 'AI-801', 'Air India', 'Kolkata', 'Mumbai', '06:00', '08:45', 165, 5000, 12500, 'Boeing 787'),
-        flight(47, '6E-1301', 'IndiGo', 'Kolkata', 'Mumbai', '13:00', '15:45', 165, 4200, 10500, 'Airbus A321'),
-        // Mumbai to Kolkata
-        flight(48, 'AI-802', 'Air India', 'Mumbai', 'Kolkata', '10:00', '12:45', 165, 5000, 12500, 'Boeing 787'),
-        flight(49, '6E-1302', 'IndiGo', 'Mumbai', 'Kolkata', '18:00', '20:45', 165, 4200, 10500, 'Airbus A321'),
-        // Kolkata to Bangalore
-        flight(50, 'AI-901', 'Air India', 'Kolkata', 'Bangalore', '07:00', '09:45', 165, 5200, 13000, 'Boeing 787'),
-        // Bangalore to Kolkata
-        flight(51, '6E-1401', 'IndiGo', 'Bangalore', 'Kolkata', '11:00', '13:45', 165, 4800, 12000, 'Airbus A321'),
-        // Kolkata to Hyderabad
-        flight(52, '6E-1501', 'IndiGo', 'Kolkata', 'Hyderabad', '08:00', '10:15', 135, 3800, 9500, 'Airbus A320'),
-        // Hyderabad to Kolkata
-        flight(53, 'AI-1001', 'Air India', 'Hyderabad', 'Kolkata', '12:00', '14:15', 135, 4000, 10000, 'Boeing 737')
-    ]);
+    try {
+        await db.collection('flights').insertMany([
+            // Delhi to Mumbai
+            flight(1, '6E-2001', 'IndiGo', 'Delhi', 'Mumbai', '06:00', '08:10', 130, 3500, 8500, 'Airbus A320'),
+            flight(2, 'AI-101', 'Air India', 'Delhi', 'Mumbai', '09:30', '11:45', 135, 4200, 11000, 'Boeing 737'),
+            flight(3, 'SG-401', 'SpiceJet', 'Delhi', 'Mumbai', '14:00', '16:15', 135, 2800, 7200, 'Boeing 737 MAX'),
+            // Mumbai to Delhi
+            flight(4, '6E-2002', 'IndiGo', 'Mumbai', 'Delhi', '07:00', '09:10', 130, 3500, 8500, 'Airbus A320'),
+            flight(5, 'AI-102', 'Air India', 'Mumbai', 'Delhi', '12:00', '14:15', 135, 4200, 11000, 'Boeing 737'),
+            flight(6, 'SG-402', 'SpiceJet', 'Mumbai', 'Delhi', '18:00', '20:15', 135, 2800, 7200, 'Boeing 737 MAX'),
+            // Mumbai to Bangalore
+            flight(7, '6E-3001', 'IndiGo', 'Mumbai', 'Bangalore', '08:00', '09:45', 105, 3200, 7800, 'Airbus A320'),
+            flight(8, 'UK-801', 'Vistara', 'Mumbai', 'Bangalore', '11:00', '12:50', 110, 5500, 13000, 'Airbus A320neo'),
+            flight(9, 'SG-501', 'SpiceJet', 'Mumbai', 'Bangalore', '16:30', '18:20', 110, 2600, 6500, 'Boeing 737'),
+            // Bangalore to Mumbai
+            flight(10, '6E-3002', 'IndiGo', 'Bangalore', 'Mumbai', '06:30', '08:15', 105, 3200, 7800, 'Airbus A320'),
+            flight(11, 'UK-802', 'Vistara', 'Bangalore', 'Mumbai', '14:00', '15:50', 110, 5500, 13000, 'Airbus A320neo'),
+            // Delhi to Bangalore
+            flight(12, 'AI-501', 'Air India', 'Delhi', 'Bangalore', '07:00', '09:45', 165, 5200, 14000, 'Boeing 787'),
+            flight(13, '6E-4001', 'IndiGo', 'Delhi', 'Bangalore', '13:00', '15:50', 170, 4800, 12000, 'Airbus A321'),
+            // Bangalore to Delhi
+            flight(14, 'AI-502', 'Air India', 'Bangalore', 'Delhi', '10:00', '12:45', 165, 5200, 14000, 'Boeing 787'),
+            flight(15, '6E-4002', 'IndiGo', 'Bangalore', 'Delhi', '17:00', '19:50', 170, 4800, 12000, 'Airbus A321'),
+            // Bangalore to Chennai
+            flight(16, '6E-5001', 'IndiGo', 'Bangalore', 'Chennai', '08:00', '09:00', 60, 2200, 5500, 'ATR 72'),
+            flight(17, 'AI-301', 'Air India', 'Bangalore', 'Chennai', '15:00', '16:00', 60, 2800, 7000, 'Airbus A320'),
+            // Chennai to Bangalore
+            flight(18, '6E-5002', 'IndiGo', 'Chennai', 'Bangalore', '10:00', '11:00', 60, 2200, 5500, 'ATR 72'),
+            flight(19, 'AI-302', 'Air India', 'Chennai', 'Bangalore', '17:00', '18:00', 60, 2800, 7000, 'Airbus A320'),
+            // Hyderabad to Delhi
+            flight(20, '6E-6001', 'IndiGo', 'Hyderabad', 'Delhi', '06:00', '08:15', 135, 3800, 9500, 'Airbus A320'),
+            flight(21, 'SG-601', 'SpiceJet', 'Hyderabad', 'Delhi', '11:00', '13:20', 140, 3000, 7500, 'Boeing 737'),
+            // Delhi to Hyderabad
+            flight(22, '6E-6002', 'IndiGo', 'Delhi', 'Hyderabad', '09:00', '11:15', 135, 3800, 9500, 'Airbus A320'),
+            flight(23, 'SG-602', 'SpiceJet', 'Delhi', 'Hyderabad', '16:00', '18:20', 140, 3000, 7500, 'Boeing 737'),
+            // Kolkata to Delhi
+            flight(24, 'AI-201', 'Air India', 'Kolkata', 'Delhi', '07:00', '09:30', 150, 4500, 11500, 'Boeing 737'),
+            flight(25, '6E-7001', 'IndiGo', 'Kolkata', 'Delhi', '14:00', '16:30', 150, 3600, 9000, 'Airbus A320'),
+            // Delhi to Kolkata
+            flight(26, 'AI-202', 'Air India', 'Delhi', 'Kolkata', '10:00', '12:30', 150, 4500, 11500, 'Boeing 737'),
+            flight(27, '6E-7002', 'IndiGo', 'Delhi', 'Kolkata', '17:00', '19:30', 150, 3600, 9000, 'Airbus A320'),
+            // Hyderabad to Mumbai
+            flight(28, '6E-8001', 'IndiGo', 'Hyderabad', 'Mumbai', '07:30', '09:00', 90, 3000, 7500, 'Airbus A320'),
+            flight(29, 'AI-401', 'Air India', 'Hyderabad', 'Mumbai', '14:00', '15:30', 90, 3500, 8500, 'Boeing 737'),
+            // Mumbai to Hyderabad
+            flight(30, '6E-8002', 'IndiGo', 'Mumbai', 'Hyderabad', '08:00', '09:30', 90, 3000, 7500, 'Airbus A320'),
+            flight(31, 'AI-402', 'Air India', 'Mumbai', 'Hyderabad', '16:00', '17:30', 90, 3500, 8500, 'Boeing 737'),
+            // Hyderabad to Bangalore
+            flight(32, '6E-9001', 'IndiGo', 'Hyderabad', 'Bangalore', '06:30', '07:45', 75, 2800, 7000, 'Airbus A320'),
+            flight(33, 'SG-701', 'SpiceJet', 'Hyderabad', 'Bangalore', '13:00', '14:15', 75, 2400, 6000, 'Boeing 737'),
+            // Bangalore to Hyderabad
+            flight(34, '6E-9002', 'IndiGo', 'Bangalore', 'Hyderabad', '09:00', '10:15', 75, 2800, 7000, 'Airbus A320'),
+            flight(35, 'SG-702', 'SpiceJet', 'Bangalore', 'Hyderabad', '16:00', '17:15', 75, 2400, 6000, 'Boeing 737'),
+            // Chennai to Delhi
+            flight(36, 'AI-601', 'Air India', 'Chennai', 'Delhi', '06:00', '08:50', 170, 5000, 13000, 'Boeing 787'),
+            flight(37, '6E-1001', 'IndiGo', 'Chennai', 'Delhi', '14:00', '16:50', 170, 4500, 11500, 'Airbus A321'),
+            // Delhi to Chennai
+            flight(38, 'AI-602', 'Air India', 'Delhi', 'Chennai', '08:00', '10:50', 170, 5000, 13000, 'Boeing 787'),
+            flight(39, '6E-1002', 'IndiGo', 'Delhi', 'Chennai', '15:00', '17:50', 170, 4500, 11500, 'Airbus A321'),
+            // Chennai to Hyderabad
+            flight(40, '6E-1101', 'IndiGo', 'Chennai', 'Hyderabad', '08:00', '09:15', 75, 2600, 6500, 'Airbus A320'),
+            // Hyderabad to Chennai
+            flight(41, 'SG-801', 'SpiceJet', 'Hyderabad', 'Chennai', '10:00', '11:15', 75, 2600, 6500, 'Boeing 737'),
+            // Mumbai to Chennai
+            flight(42, 'AI-701', 'Air India', 'Mumbai', 'Chennai', '07:00', '09:00', 120, 3800, 9500, 'Boeing 737'),
+            flight(43, '6E-1201', 'IndiGo', 'Mumbai', 'Chennai', '15:00', '17:00', 120, 3200, 8000, 'Airbus A320'),
+            // Chennai to Mumbai
+            flight(44, 'AI-702', 'Air India', 'Chennai', 'Mumbai', '09:00', '11:00', 120, 3800, 9500, 'Boeing 737'),
+            flight(45, '6E-1202', 'IndiGo', 'Chennai', 'Mumbai', '17:00', '19:00', 120, 3200, 8000, 'Airbus A320'),
+            // Kolkata to Mumbai
+            flight(46, 'AI-801', 'Air India', 'Kolkata', 'Mumbai', '06:00', '08:45', 165, 5000, 12500, 'Boeing 787'),
+            flight(47, '6E-1301', 'IndiGo', 'Kolkata', 'Mumbai', '13:00', '15:45', 165, 4200, 10500, 'Airbus A321'),
+            // Mumbai to Kolkata
+            flight(48, 'AI-802', 'Air India', 'Mumbai', 'Kolkata', '10:00', '12:45', 165, 5000, 12500, 'Boeing 787'),
+            flight(49, '6E-1302', 'IndiGo', 'Mumbai', 'Kolkata', '18:00', '20:45', 165, 4200, 10500, 'Airbus A321'),
+            // Kolkata to Bangalore
+            flight(50, 'AI-901', 'Air India', 'Kolkata', 'Bangalore', '07:00', '09:45', 165, 5200, 13000, 'Boeing 787'),
+            // Bangalore to Kolkata
+            flight(51, '6E-1401', 'IndiGo', 'Bangalore', 'Kolkata', '11:00', '13:45', 165, 4800, 12000, 'Airbus A321'),
+            // Kolkata to Hyderabad
+            flight(52, '6E-1501', 'IndiGo', 'Kolkata', 'Hyderabad', '08:00', '10:15', 135, 3800, 9500, 'Airbus A320'),
+            // Hyderabad to Kolkata
+            flight(53, 'AI-1001', 'Air India', 'Hyderabad', 'Kolkata', '12:00', '14:15', 135, 4000, 10000, 'Boeing 737')
+        ]);
+    } catch(e) { console.log('Flights insert note:', e.message); }
 
-    // Seed Connecting Flights — guaranteed connecting routes
-    await db.collection('connecting_flights').insertMany([
-        // Hyderabad to Delhi via Mumbai
-        { id: 1, route_name: 'Hyderabad-Delhi via Mumbai', flight1_id: 28, flight2_id: 4, layover_minutes: 90, discount_percent: 10 },
-        // Delhi to Mumbai via Bangalore (alternate)
-        { id: 2, route_name: 'Delhi-Chennai via Bangalore', flight1_id: 12, flight2_id: 17, layover_minutes: 75, discount_percent: 10 },
-        // Mumbai to Chennai via Bangalore
-        { id: 3, route_name: 'Mumbai-Chennai via Bangalore', flight1_id: 7, flight2_id: 17, layover_minutes: 90, discount_percent: 8 },
-        // Chennai to Delhi via Bangalore
-        { id: 4, route_name: 'Chennai-Delhi via Bangalore', flight1_id: 18, flight2_id: 14, layover_minutes: 60, discount_percent: 8 },
-        // Kolkata to Bangalore via Delhi
-        { id: 5, route_name: 'Kolkata-Bangalore via Delhi', flight1_id: 24, flight2_id: 12, layover_minutes: 90, discount_percent: 12 },
-        // Bangalore to Kolkata via Delhi
-        { id: 6, route_name: 'Bangalore-Kolkata via Delhi', flight1_id: 14, flight2_id: 26, layover_minutes: 75, discount_percent: 10 }
-    ]);
+    try {
+        await db.collection('connecting_flights').insertMany([
+            // Hyderabad to Delhi via Mumbai
+            { id: 1, route_name: 'Hyderabad-Delhi via Mumbai', flight1_id: 28, flight2_id: 4, layover_minutes: 90, discount_percent: 10 },
+            // Delhi to Chennai via Bangalore
+            { id: 2, route_name: 'Delhi-Chennai via Bangalore', flight1_id: 12, flight2_id: 17, layover_minutes: 75, discount_percent: 10 },
+            // Mumbai to Chennai via Bangalore
+            { id: 3, route_name: 'Mumbai-Chennai via Bangalore', flight1_id: 7, flight2_id: 17, layover_minutes: 90, discount_percent: 8 },
+            // Chennai to Delhi via Bangalore
+            { id: 4, route_name: 'Chennai-Delhi via Bangalore', flight1_id: 18, flight2_id: 14, layover_minutes: 60, discount_percent: 8 },
+            // Kolkata to Bangalore via Delhi
+            { id: 5, route_name: 'Kolkata-Bangalore via Delhi', flight1_id: 24, flight2_id: 12, layover_minutes: 90, discount_percent: 12 },
+            // Bangalore to Kolkata via Delhi
+            { id: 6, route_name: 'Bangalore-Kolkata via Delhi', flight1_id: 14, flight2_id: 26, layover_minutes: 75, discount_percent: 10 }
+        ]);
+    } catch(e) { console.log('Connecting flights insert note:', e.message); }
 
     const count = await db.collection('flights').countDocuments();
     const cfCount = await db.collection('connecting_flights').countDocuments();
