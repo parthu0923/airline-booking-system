@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmed — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <a href="index.html" class="navbar-brand">
+                <span class="logo-icon">✈</span>
+                <span>SkyWings</span>
+            </a>
+            <div class="navbar-links">
+                <a href="flightsearch.html">Book Another Flight</a>
+                <a href="index.html" onclick="sessionStorage.clear();">Logout</a>
+            </div>
+        </nav>
+
+        <div class="page-header">
+            <h1 class="animate-fadeInUp" style="font-size:2.2rem;">Booking Confirmed!</h1>
+            <p class="animate-fadeInUp delay-1">Your flight has been booked successfully. Here's your boarding pass.</p>
+        </div>
+
+        <div class="container" style="max-width: 700px;">
+            <!-- Boarding Pass -->
+            <div class="boarding-pass animate-fadeInUp delay-2" id="boardingPass">
+                <div class="boarding-pass-header">
+                    <h3>✈ SkyWings</h3>
+                    <div>
+                        <div style="font-size:0.7rem; opacity:0.8;">PNR</div>
+                        <div class="boarding-pass-pnr" id="pnrDisplay"></div>
+                    </div>
+                </div>
+
+                <div class="boarding-pass-body">
+                    <div class="boarding-pass-route">
+                        <div class="bp-city">
+                            <div class="bp-city-code" id="fromCode"></div>
+                            <div class="bp-city-name" id="fromCity"></div>
+                        </div>
+
+                        <div class="bp-plane">✈</div>
+
+                        <div class="bp-city">
+                            <div class="bp-city-code" id="toCode"></div>
+                            <div class="bp-city-name" id="toCity"></div>
+                        </div>
+                    </div>
+
+                    <div class="boarding-pass-details">
+                        <div class="bp-detail-item">
+                            <label>DATE</label>
+                            <div class="value" id="bpDate"></div>
+                        </div>
+                        <div class="bp-detail-item">
+                            <label>FLIGHT</label>
+                            <div class="value" id="bpFlight"></div>
+                        </div>
+                        <div class="bp-detail-item">
+                            <label>CLASS</label>
+                            <div class="value" id="bpClass"></div>
+                        </div>
+                        <div class="bp-detail-item">
+                            <label>DEPARTURE</label>
+                            <div class="value" id="bpDeparture"></div>
+                        </div>
+                        <div class="bp-detail-item">
+                            <label>ARRIVAL</label>
+                            <div class="value" id="bpArrival"></div>
+                        </div>
+                        <div class="bp-detail-item">
+                            <label>SEAT(S)</label>
+                            <div class="value" id="bpSeats"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Passenger Details -->
+                <div style="padding: 1rem 2rem; border-top: 2px dashed var(--border-color);">
+                    <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Passengers</div>
+                    <div id="passengerList"></div>
+                </div>
+
+                <!-- Total Amount -->
+                <div style="padding: 1rem 2rem; border-top: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:var(--text-muted);">Amount Paid</span>
+                    <span style="font-size:1.5rem; font-weight:800; color:var(--color-accent);" id="bpAmount"></span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="boarding-pass-actions animate-fadeInUp delay-3">
+                <button class="btn btn-outline" onclick="window.print()">Print Ticket</button>
+                <a href="cab.html" class="btn btn-primary">Book Cab</a>
+                <a href="hotel.html" class="btn btn-success">Book Hotel</a>
+                <a href="summary.html" class="btn btn-accent">View Summary</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const booking = JSON.parse(sessionStorage.getItem('bookingResult') || '{}');
+
+        if (!booking.pnr) {
+            window.location.href = 'flightsearch.html';
+        }
+
+        // Populate boarding pass
+        document.getElementById('pnrDisplay').textContent = booking.pnr;
+        document.getElementById('fromCode').textContent = booking.from;
+        document.getElementById('fromCity').textContent = booking.from;
+        document.getElementById('toCode').textContent = booking.to;
+        document.getElementById('toCity').textContent = booking.to;
+        document.getElementById('bpDate').textContent = new Date(booking.date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+        document.getElementById('bpFlight').textContent = booking.flightNumber;
+        document.getElementById('bpClass').textContent = (booking.seatClass || 'economy').charAt(0).toUpperCase() + (booking.seatClass || 'economy').slice(1);
+        document.getElementById('bpDeparture').textContent = booking.departureTime;
+        document.getElementById('bpArrival').textContent = booking.arrivalTime;
+        document.getElementById('bpSeats').textContent = (booking.selectedSeats || []).join(', ') || 'N/A';
+        document.getElementById('bpAmount').textContent = `₹${Number(booking.totalAmount || 0).toLocaleString('en-IN')}`;
+
+        // Passenger list
+        const passengers = booking.passengers || [];
+        let passengerHtml = '';
+        passengers.forEach((p, i) => {
+            passengerHtml += `
+            <div style="display:flex; justify-content:space-between; padding:0.4rem 0; font-size:0.9rem; ${i < passengers.length - 1 ? 'border-bottom:1px solid var(--border-color);' : ''}">
+                <span>${p.name}</span>
+                <span style="color:var(--text-muted);">Seat ${p.seatNumber || (booking.selectedSeats && booking.selectedSeats[i]) || 'N/A'}</span>
+            </div>`;
+        });
+        document.getElementById('passengerList').innerHTML = passengerHtml || '<p style="color:var(--text-muted);">No passenger details</p>';
+    </script>
+</body>
+</html>
