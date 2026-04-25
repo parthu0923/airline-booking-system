@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <a href="index.html" class="navbar-brand">
+                <span class="logo-icon">✈</span>
+                <span>SkyWings</span>
+            </a>
+            <div class="navbar-links">
+                <div class="user-dropdown-wrapper">
+                    <span class="user-name-link" id="userGreeting" onclick="toggleUserDropdown()"></span>
+                    <div class="user-dropdown-menu" id="userDropdownMenu">
+                        <a href="mybookings.html" class="user-dropdown-item active-item">Bookings</a>
+                    </div>
+                </div>
+                <a href="flightsearch.html">Book Flight</a>
+                <a href="index.html" onclick="sessionStorage.clear();">Logout</a>
+            </div>
+        </nav>
+
+        <div class="page-header">
+            <h1 class="animate-fadeInUp">My Bookings</h1>
+            <p class="animate-fadeInUp delay-1">View all your flight bookings and details</p>
+        </div>
+
+        <div class="container" style="max-width: 900px;">
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-overlay animate-fadeInUp delay-2">
+                <div class="spinner"></div>
+                <p>Loading your bookings...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="glass-card-static animate-fadeInUp delay-2 hidden" style="text-align:center; padding:3rem;">
+                <h3 style="color:var(--text-muted); margin-bottom:0.5rem;">No Bookings Yet</h3>
+                <p style="color:var(--text-muted); margin-bottom:1.5rem;">You haven't booked any flights yet. Start your journey today!</p>
+                <a href="flightsearch.html" class="btn btn-primary btn-lg">Search Flights</a>
+            </div>
+
+            <!-- Bookings List -->
+            <div id="bookingsList" class="bookings-list hidden">
+            </div>
+
+            <!-- Booking Detail Modal/Panel -->
+            <div id="bookingDetailOverlay" class="booking-detail-overlay hidden" onclick="closeBookingDetail(event)">
+                <div class="booking-detail-panel animate-fadeInUp" onclick="event.stopPropagation()">
+                    <div class="detail-panel-header">
+                        <h3>Booking Summary</h3>
+                        <button class="detail-close-btn" onclick="closeBookingDetail()">&times;</button>
+                    </div>
+                    <div class="detail-panel-body" id="detailPanelBody">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Check login
+        const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+        if (!user.id) {
+            window.location.href = 'login.html';
+        }
+
+        // Set username in nav
+        if (user.username) {
+            document.getElementById('userGreeting').textContent = user.username;
+        }
+
+        // Dropdown toggle
+        function toggleUserDropdown() {
+            const menu = document.getElementById('userDropdownMenu');
+            menu.classList.toggle('show');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const wrapper = document.querySelector('.user-dropdown-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('userDropdownMenu').classList.remove('show');
+            }
+        });
+
+        let allBookings = [];
+
+        // Fetch bookings
+        async function loadBookings() {
+            try {
+                const res = await fetch(`/api/user-bookings?userId=${user.id}`);
+                const data = await res.json();
+
+                document.getElementById('loadingState').classList.add('hidden');
+
+                if (data.success && data.bookings.length > 0) {
+                    allBookings = data.bookings;
+                    renderBookings(data.bookings);
+                } else {
+                    document.getElementById('emptyState').classList.remove('hidden');
+                }
+            } catch(e) {
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+                document.getElementById('emptyState').querySelector('h3').textContent = 'Unable to Load Bookings';
+                document.getElementById('emptyState').querySelector('p').textContent = 'There was an error loading your bookings. Please try again.';
+            }
+        }
+
+        function renderBookings(bookings) {
+            const container = document.getElementById('bookingsList');
+            container.classList.remove('hidden');
+
+            let html = '';
+            bookings.forEach((b, index) => {
+                const flightInfo = b.flight || {};
+                const bookingDate = b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'N/A';
+                const flightDate = b.flightDate ? new Date(b.flightDate).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : b.flightDate || 'N/A';
+                const statusClass = b.status === 'confirmed' ? 'badge-success' : 'badge-warning';
+
+                html += `
+                <div class="booking-card glass-card-static animate-fadeInUp" style="animation-delay:${0.05 * (index + 1)}s; opacity:0;" onclick="showBookingDetail(${index})">
+                    <div class="booking-card-top">
+                        <div class="booking-card-route">
+                            <div class="booking-route-city">
+                                <span class="route-city-name">${flightInfo.source || 'N/A'}</span>
+                            </div>
+                            <div class="booking-route-line">
+                                <span class="route-plane">✈</span>
+                                <div class="route-dash"></div>
+                            </div>
+                            <div class="booking-route-city">
+                                <span class="route-city-name">${flightInfo.destination || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <div class="booking-card-price">
+                            <span class="booking-amount">₹${Number(b.totalAmount || 0).toLocaleString('en-IN')}</span>
+                            <span class="badge ${statusClass}">${b.status || 'confirmed'}</span>
+                        </div>
+                    </div>
+                    <div class="booking-card-bottom">
+                        <div class="booking-meta">
+                            <span class="booking-meta-item"><strong>PNR:</strong> ${b.pnr}</span>
+                            <span class="booking-meta-item"><strong>Flight:</strong> ${flightInfo.flightNumber || 'N/A'}</span>
+                            <span class="booking-meta-item"><strong>Date:</strong> ${flightDate}</span>
+                            <span class="booking-meta-item"><strong>Class:</strong> ${(b.seatClass || 'economy').charAt(0).toUpperCase() + (b.seatClass || 'economy').slice(1)}</span>
+                        </div>
+                        <span class="booking-view-btn">View Details →</span>
+                    </div>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function showBookingDetail(index) {
+            const b = allBookings[index];
+            if (!b) return;
+
+            const flightInfo = b.flight || {};
+            const flightDate = b.flightDate ? new Date(b.flightDate).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : b.flightDate || 'N/A';
+            const bookingDate = b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'N/A';
+
+            let html = '';
+
+            // Flight section
+            html += `
+            <div class="detail-section">
+                <h4 class="detail-section-title">Flight Booking</h4>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">PNR</span>
+                        <span class="detail-value" style="font-family:monospace; letter-spacing:2px;">${b.pnr}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Flight</span>
+                        <span class="detail-value">${flightInfo.flightNumber || 'N/A'} — ${flightInfo.airline || ''}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Route</span>
+                        <span class="detail-value">${flightInfo.source || ''} → ${flightInfo.destination || ''}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Flight Date</span>
+                        <span class="detail-value">${flightDate}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Departure</span>
+                        <span class="detail-value">${flightInfo.departureTime || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Arrival</span>
+                        <span class="detail-value">${flightInfo.arrivalTime || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Class</span>
+                        <span class="detail-value">${(b.seatClass || 'economy').charAt(0).toUpperCase() + (b.seatClass || 'economy').slice(1)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Aircraft</span>
+                        <span class="detail-value">${flightInfo.aircraft || 'N/A'}</span>
+                    </div>
+                </div>
+            </div>`;
+
+            // Passengers section
+            if (b.passengers && b.passengers.length > 0) {
+                html += `
+                <div class="detail-section">
+                    <h4 class="detail-section-title">Passengers</h4>
+                    <div class="detail-passengers">`;
+                b.passengers.forEach((p, i) => {
+                    html += `
+                        <div class="detail-passenger-row">
+                            <span class="passenger-name">${p.name || 'Passenger ' + (i+1)}</span>
+                            <span class="passenger-seat">Seat ${p.seatNumber || 'N/A'}</span>
+                        </div>`;
+                });
+                html += `</div></div>`;
+            }
+
+            // Cab section
+            if (b.cab) {
+                html += `
+                <div class="detail-section">
+                    <h4 class="detail-section-title">Cab Booking</h4>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Pickup</span>
+                            <span class="detail-value">${b.cab.pickup}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Drop</span>
+                            <span class="detail-value">${b.cab.drop}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Cab Type</span>
+                            <span class="detail-value">${b.cab.cabType}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Cab Amount</span>
+                            <span class="detail-value">₹${Number(b.cab.amount || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            // Hotel section
+            if (b.hotel) {
+                html += `
+                <div class="detail-section">
+                    <h4 class="detail-section-title">Hotel Booking</h4>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Hotel</span>
+                            <span class="detail-value">${b.hotel.hotelName}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Room Type</span>
+                            <span class="detail-value">${b.hotel.roomType}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Check-in</span>
+                            <span class="detail-value">${b.hotel.checkin ? new Date(b.hotel.checkin).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'N/A'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Check-out</span>
+                            <span class="detail-value">${b.hotel.checkout ? new Date(b.hotel.checkout).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'N/A'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Hotel Amount</span>
+                            <span class="detail-value">₹${Number(b.hotel.amount || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            // Total section
+            let grandTotal = Number(b.totalAmount || 0);
+            if (b.cab) grandTotal += Number(b.cab.amount || 0);
+            if (b.hotel) grandTotal += Number(b.hotel.amount || 0);
+
+            html += `
+            <div class="detail-section detail-total-section">
+                <div class="detail-total-row">
+                    <span>Flight Amount</span>
+                    <span>₹${Number(b.totalAmount || 0).toLocaleString('en-IN')}</span>
+                </div>`;
+            if (b.cab) {
+                html += `
+                <div class="detail-total-row">
+                    <span>Cab Amount</span>
+                    <span>₹${Number(b.cab.amount || 0).toLocaleString('en-IN')}</span>
+                </div>`;
+            }
+            if (b.hotel) {
+                html += `
+                <div class="detail-total-row">
+                    <span>Hotel Amount</span>
+                    <span>₹${Number(b.hotel.amount || 0).toLocaleString('en-IN')}</span>
+                </div>`;
+            }
+            html += `
+                <div class="detail-total-row detail-grand-total">
+                    <span>Grand Total</span>
+                    <span>₹${grandTotal.toLocaleString('en-IN')}</span>
+                </div>
+            </div>`;
+
+            // Booking date and status
+            html += `
+            <div class="detail-section" style="display:flex; justify-content:space-between; align-items:center; padding-top:0.8rem; border-top:1px solid var(--border-color);">
+                <span style="color:var(--text-muted); font-size:0.85rem;">Booked on ${bookingDate}</span>
+                <span class="badge badge-success">${b.status || 'confirmed'}</span>
+            </div>`;
+
+            document.getElementById('detailPanelBody').innerHTML = html;
+            document.getElementById('bookingDetailOverlay').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeBookingDetail(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('bookingDetailOverlay').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeBookingDetail();
+        });
+
+        // Load bookings on page load
+        loadBookings();
+    </script>
+</body>
+</html>
