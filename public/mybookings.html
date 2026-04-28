@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="index.html">✈ SkyWings</a>
+        <div>
+            <div class="user-dropdown-wrapper">
+                <span class="user-name-link" id="userGreeting" onclick="toggleUserDropdown()"></span>
+                <div class="user-dropdown-menu" id="userDropdownMenu">
+                    <a href="mybookings.html" class="user-dropdown-item">Bookings</a>
+                </div>
+            </div>
+            <a href="flightsearch.html">Book Flight</a>
+            <a href="index.html" onclick="sessionStorage.clear();">Logout</a>
+        </div>
+    </nav>
+
+    <div class="page-header">
+        <h1>My Bookings</h1>
+        <p>View all your flight bookings and details</p>
+    </div>
+
+    <div class="container" style="max-width:900px">
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-overlay">
+            <div class="spinner"></div>
+            <p>Loading your bookings...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="card-static hidden" style="text-align:center; padding:3rem">
+            <h3 style="color:var(--muted)">No Bookings Yet</h3>
+            <p style="color:var(--muted); margin-bottom:1.5rem">You haven't booked any flights yet.</p>
+            <a href="flightsearch.html" class="btn btn-primary btn-lg">Search Flights</a>
+        </div>
+
+        <!-- Bookings List -->
+        <div id="bookingsList" class="bookings-list hidden"></div>
+
+        <!-- Booking Detail Modal -->
+        <div id="bookingDetailOverlay" class="booking-detail-overlay hidden" onclick="closeBookingDetail(event)">
+            <div class="booking-detail-panel" onclick="event.stopPropagation()">
+                <div class="detail-panel-header">
+                    <h3>Booking Summary</h3>
+                    <button class="detail-close-btn" onclick="closeBookingDetail()">&times;</button>
+                </div>
+                <div class="detail-panel-body" id="detailPanelBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+        if (!user.id) window.location.href = 'login.html';
+
+        if (user.username) {
+            document.getElementById('userGreeting').textContent = user.username;
+        }
+
+        function toggleUserDropdown() {
+            document.getElementById('userDropdownMenu').classList.toggle('show');
+        }
+
+        document.addEventListener('click', function(e) {
+            const wrapper = document.querySelector('.user-dropdown-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('userDropdownMenu').classList.remove('show');
+            }
+        });
+
+        let allBookings = [];
+
+        // Helper functions
+        function detailItem(label, value) {
+            return '<div class="detail-item">' +
+                '<span class="detail-label">' + label + '</span>' +
+                '<span class="detail-value">' + value + '</span>' +
+                '</div>';
+        }
+
+        function formatDate(d) {
+            if (!d) return 'N/A';
+            return new Date(d).toLocaleDateString('en-IN', {
+                day: 'numeric', month: 'short', year: 'numeric'
+            });
+        }
+
+        async function loadBookings() {
+            try {
+                const res = await fetch('/api/user-bookings?userId=' + user.id);
+                const data = await res.json();
+
+                document.getElementById('loadingState').classList.add('hidden');
+
+                if (data.success && data.bookings.length > 0) {
+                    allBookings = data.bookings;
+                    renderBookings(data.bookings);
+                } else {
+                    document.getElementById('emptyState').classList.remove('hidden');
+                }
+            } catch(e) {
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+                document.getElementById('emptyState').querySelector('h3').textContent = 'Unable to Load Bookings';
+                document.getElementById('emptyState').querySelector('p').textContent = 'There was an error. Please try again.';
+            }
+        }
+
+        function renderBookings(bookings) {
+            const container = document.getElementById('bookingsList');
+            container.classList.remove('hidden');
+            let html = '';
+
+            bookings.forEach((b, index) => {
+                const f = b.flight || {};
+                const flightDate = formatDate(b.flightDate || b.flightDate);
+                const statusClass = b.status === 'confirmed' ? 'badge-success' : 'badge-warning';
+                const cls = (b.seatClass || 'economy').charAt(0).toUpperCase() + (b.seatClass || 'economy').slice(1);
+
+                html += '<div class="booking-card card-static" onclick="showBookingDetail(' + index + ')">';
+                html += '  <div class="booking-card-top">';
+                html += '    <div class="booking-card-route">';
+                html += '      <div><span class="route-city-name">' + (f.source || 'N/A') + '</span></div>';
+                html += '      <div class="booking-route-line"><span class="route-plane">✈</span><div class="route-dash"></div></div>';
+                html += '      <div><span class="route-city-name">' + (f.destination || 'N/A') + '</span></div>';
+                html += '    </div>';
+                html += '    <div class="booking-card-price">';
+                html += '      <span class="booking-amount">₹' + Number(b.totalAmount || 0).toLocaleString('en-IN') + '</span>';
+                html += '      <span class="badge ' + statusClass + '">' + (b.status || 'confirmed') + '</span>';
+                html += '    </div>';
+                html += '  </div>';
+                html += '  <div class="booking-card-bottom">';
+                html += '    <div class="booking-meta">';
+                html += '      <span class="booking-meta-item"><strong>PNR:</strong> ' + b.pnr + '</span>';
+                html += '      <span class="booking-meta-item"><strong>Flight:</strong> ' + (f.flightNumber || 'N/A') + '</span>';
+                html += '      <span class="booking-meta-item"><strong>Date:</strong> ' + flightDate + '</span>';
+                html += '      <span class="booking-meta-item"><strong>Class:</strong> ' + cls + '</span>';
+                html += '    </div>';
+                html += '    <span class="booking-view-btn">View Details →</span>';
+                html += '  </div>';
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        function showBookingDetail(index) {
+            const b = allBookings[index];
+            if (!b) return;
+
+            const f = b.flight || {};
+            const flightDate = formatDate(b.flightDate);
+            const bookingDate = formatDate(b.bookingDate);
+            const cls = (b.seatClass || 'economy').charAt(0).toUpperCase() + (b.seatClass || 'economy').slice(1);
+
+            // Flight section
+            let html = '<div class="detail-section">';
+            html += '<h4 class="detail-section-title">Flight Booking</h4>';
+            html += '<div class="detail-grid">';
+            html += detailItem('PNR', b.pnr);
+            html += detailItem('Flight', (f.flightNumber || 'N/A') + ' — ' + (f.airline || ''));
+            html += detailItem('Route', (f.source || '') + ' → ' + (f.destination || ''));
+            html += detailItem('Flight Date', flightDate);
+            html += detailItem('Departure', f.departureTime || 'N/A');
+            html += detailItem('Arrival', f.arrivalTime || 'N/A');
+            html += detailItem('Class', cls);
+            html += detailItem('Aircraft', f.aircraft || 'N/A');
+            html += '</div></div>';
+
+            // Passengers section
+            if (b.passengers && b.passengers.length > 0) {
+                html += '<div class="detail-section">';
+                html += '<h4 class="detail-section-title">Passengers</h4>';
+                html += '<div class="detail-passengers">';
+                b.passengers.forEach((p, i) => {
+                    html += '<div class="detail-passenger-row">';
+                    html += '<span class="passenger-name">' + (p.name || 'Passenger ' + (i + 1)) + '</span>';
+                    html += '<span class="passenger-seat">Seat ' + (p.seatNumber || 'N/A') + '</span>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            }
+
+            // Cab section
+            if (b.cab) {
+                html += '<div class="detail-section">';
+                html += '<h4 class="detail-section-title">Cab Booking</h4>';
+                html += '<div class="detail-grid">';
+                html += detailItem('Pickup', b.cab.pickup);
+                html += detailItem('Drop', b.cab.drop);
+                html += detailItem('Cab Type', b.cab.cabType);
+                html += detailItem('Cab Amount', '₹' + Number(b.cab.amount || 0).toLocaleString('en-IN'));
+                html += '</div></div>';
+            }
+
+            // Hotel section
+            if (b.hotel) {
+                html += '<div class="detail-section">';
+                html += '<h4 class="detail-section-title">Hotel Booking</h4>';
+                html += '<div class="detail-grid">';
+                html += detailItem('Hotel', b.hotel.hotelName);
+                html += detailItem('Room', b.hotel.roomType);
+                html += detailItem('Check-in', formatDate(b.hotel.checkin));
+                html += detailItem('Check-out', formatDate(b.hotel.checkout));
+                html += detailItem('Hotel Amount', '₹' + Number(b.hotel.amount || 0).toLocaleString('en-IN'));
+                html += '</div></div>';
+            }
+
+            // Total section
+            let grandTotal = Number(b.totalAmount || 0);
+            if (b.cab) grandTotal += Number(b.cab.amount || 0);
+            if (b.hotel) grandTotal += Number(b.hotel.amount || 0);
+
+            html += '<div class="detail-section detail-total-section">';
+            html += '<div class="detail-total-row"><span>Flight Amount</span><span>₹' + Number(b.totalAmount || 0).toLocaleString('en-IN') + '</span></div>';
+            if (b.cab) {
+                html += '<div class="detail-total-row"><span>Cab Amount</span><span>₹' + Number(b.cab.amount || 0).toLocaleString('en-IN') + '</span></div>';
+            }
+            if (b.hotel) {
+                html += '<div class="detail-total-row"><span>Hotel Amount</span><span>₹' + Number(b.hotel.amount || 0).toLocaleString('en-IN') + '</span></div>';
+            }
+            html += '<div class="detail-total-row detail-grand-total"><span>Grand Total</span><span>₹' + grandTotal.toLocaleString('en-IN') + '</span></div>';
+            html += '</div>';
+
+            // Footer
+            html += '<div class="detail-section" style="display:flex; justify-content:space-between; align-items:center; padding-top:.8rem; border-top:1px solid var(--border)">';
+            html += '<span style="color:var(--muted); font-size:.85rem">Booked on ' + bookingDate + '</span>';
+            html += '<span class="badge badge-success">' + (b.status || 'confirmed') + '</span>';
+            html += '</div>';
+
+            document.getElementById('detailPanelBody').innerHTML = html;
+            document.getElementById('bookingDetailOverlay').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeBookingDetail(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('bookingDetailOverlay').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeBookingDetail();
+        });
+
+        loadBookings();
+    </script>
+
+</body>
+</html>

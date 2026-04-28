@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Summary — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="index.html">✈ SkyWings</a>
+        <div>
+            <a href="flightsearch.html">Book Another Flight</a>
+            <a href="index.html" onclick="sessionStorage.clear();">Logout</a>
+        </div>
+    </nav>
+
+    <div class="page-header">
+        <h1>Complete Booking Summary</h1>
+        <p>Here are all your booking details</p>
+    </div>
+
+    <div class="container" style="max-width:800px">
+
+        <!-- Flight Section -->
+        <div class="card-static" style="margin-bottom:1.5rem">
+            <h3 style="color:var(--blue); margin-bottom:1rem">Flight Booking</h3>
+            <div id="flightGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:.8rem"></div>
+            <div class="summary-divider" style="margin:.8rem 0"></div>
+            <div style="font-size:.8rem; color:var(--muted); text-transform:uppercase; margin-bottom:.5rem">Passengers</div>
+            <div id="sumPassengers"></div>
+            <div class="summary-divider" style="margin:.8rem 0"></div>
+            <div style="display:flex; justify-content:space-between">
+                <span style="font-weight:600">Flight Amount</span>
+                <span style="font-weight:700; color:var(--blue)" id="sumFA"></span>
+            </div>
+        </div>
+
+        <!-- Cab Section -->
+        <div id="cabSection" class="card-static hidden" style="margin-bottom:1.5rem">
+            <h3 style="color:var(--blue); margin-bottom:1rem">Cab Booking</h3>
+            <div id="cabGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:.8rem"></div>
+            <div class="summary-divider" style="margin:.8rem 0"></div>
+            <div style="display:flex; justify-content:space-between">
+                <span style="font-weight:600">Cab Amount</span>
+                <span style="font-weight:700; color:var(--blue)" id="sumCA"></span>
+            </div>
+        </div>
+        <div id="noCab" class="card-static" style="margin-bottom:1.5rem">
+            <div style="display:flex; justify-content:space-between">
+                <div>
+                    <h3 style="color:var(--muted)">Cab Booking</h3>
+                    <p style="color:var(--muted); font-size:.9rem">No cab booked</p>
+                </div>
+                <span style="font-weight:700; color:var(--muted)">₹0</span>
+            </div>
+        </div>
+
+        <!-- Hotel Section -->
+        <div id="hotelSection" class="card-static hidden" style="margin-bottom:1.5rem">
+            <h3 style="color:var(--blue); margin-bottom:1rem">Hotel Booking</h3>
+            <div id="hotelGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:.8rem"></div>
+            <div class="summary-divider" style="margin:.8rem 0"></div>
+            <div style="display:flex; justify-content:space-between">
+                <span style="font-weight:600">Hotel Amount</span>
+                <span style="font-weight:700; color:var(--blue)" id="sumHA"></span>
+            </div>
+        </div>
+        <div id="noHotel" class="card-static" style="margin-bottom:1.5rem">
+            <div style="display:flex; justify-content:space-between">
+                <div>
+                    <h3 style="color:var(--muted)">Hotel Booking</h3>
+                    <p style="color:var(--muted); font-size:.9rem">No hotel booked</p>
+                </div>
+                <span style="font-weight:700; color:var(--muted)">₹0</span>
+            </div>
+        </div>
+
+        <!-- Grand Total -->
+        <div class="card-static" style="margin-bottom:1.5rem; background:#eef2ff">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+                <div>
+                    <h3>Grand Total</h3>
+                    <p style="color:var(--muted); font-size:.85rem" id="breakdown"></p>
+                </div>
+                <span style="font-size:2rem; font-weight:800; color:var(--blue)" id="grand"></span>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex; gap:.8rem; justify-content:center; margin-bottom:2rem">
+            <button class="btn btn-outline btn-lg" onclick="window.print()">Print Summary</button>
+            <a href="flightsearch.html" class="btn btn-primary btn-lg">Book Another Flight</a>
+            <a href="index.html" class="btn btn-accent btn-lg" onclick="sessionStorage.clear();">Go Home</a>
+        </div>
+    </div>
+
+    <script>
+        const b = JSON.parse(sessionStorage.getItem('bookingResult') || '{}');
+        const cb = JSON.parse(sessionStorage.getItem('cabBooking') || 'null');
+        const hb = JSON.parse(sessionStorage.getItem('hotelBooking') || 'null');
+
+        if (!b.pnr) window.location.href = 'flightsearch.html';
+
+        // Helper to create summary item HTML
+        function summaryItem(label, value) {
+            return `<div class="summary-item">
+                <span class="label">${label}</span>
+                <span class="value">${value}</span>
+            </div>`;
+        }
+
+        // Helper to format date
+        function formatDate(d) {
+            return new Date(d).toLocaleDateString('en-IN', {
+                day: 'numeric', month: 'short', year: 'numeric'
+            });
+        }
+
+        // Flight section
+        const cls = (b.seatClass || 'economy').charAt(0).toUpperCase() + (b.seatClass || 'economy').slice(1);
+        document.getElementById('flightGrid').innerHTML =
+            summaryItem('PNR', b.pnr) +
+            summaryItem('Flight', b.flightNumber + ' — ' + b.airline) +
+            summaryItem('Route', b.from + ' → ' + b.to) +
+            summaryItem('Date', formatDate(b.date)) +
+            summaryItem('Departure', b.departureTime) +
+            summaryItem('Arrival', b.arrivalTime) +
+            summaryItem('Class', cls) +
+            summaryItem('Seats', (b.selectedSeats || []).join(', ') || 'N/A');
+
+        // Flight amount
+        const fa = Number(b.totalAmount || 0);
+        document.getElementById('sumFA').textContent = '₹' + fa.toLocaleString('en-IN');
+
+        // Passengers
+        const passengers = b.passengers || [];
+        let ph = '';
+        passengers.forEach((p, i) => {
+            const border = i < passengers.length - 1 ? 'border-bottom:1px solid var(--border)' : '';
+            ph += `<div style="display:flex; justify-content:space-between; padding:.3rem 0; font-size:.9rem; ${border}">
+                <span>${p.name} (${p.gender}, Age: ${p.age})</span>
+                <span style="color:var(--muted)">Seat ${p.seatNumber || 'N/A'}</span>
+            </div>`;
+        });
+        document.getElementById('sumPassengers').innerHTML = ph || '<p style="color:var(--muted)">No details</p>';
+
+        // Cab section
+        let ca = 0;
+        if (cb) {
+            document.getElementById('cabSection').classList.remove('hidden');
+            document.getElementById('noCab').classList.add('hidden');
+            ca = cb.amount;
+            document.getElementById('cabGrid').innerHTML =
+                summaryItem('Pickup', cb.pickup) +
+                summaryItem('Drop', cb.drop) +
+                summaryItem('Cab Type', cb.cabType) +
+                summaryItem('Pooling', cb.isPooling ? 'Yes (-30%)' : 'No') +
+                summaryItem('Date', formatDate(cb.bookingDate));
+            document.getElementById('sumCA').textContent = '₹' + ca.toLocaleString('en-IN');
+        }
+
+        // Hotel section
+        let ha = 0;
+        if (hb) {
+            document.getElementById('hotelSection').classList.remove('hidden');
+            document.getElementById('noHotel').classList.add('hidden');
+            ha = hb.amount;
+            document.getElementById('hotelGrid').innerHTML =
+                summaryItem('Hotel', hb.hotelName) +
+                summaryItem('Room', hb.roomType) +
+                summaryItem('Check-in', formatDate(hb.checkin)) +
+                summaryItem('Check-out', formatDate(hb.checkout)) +
+                summaryItem('Nights', hb.nights);
+            document.getElementById('sumHA').textContent = '₹' + ha.toLocaleString('en-IN');
+        }
+
+        // Grand total
+        const gt = fa + ca + ha;
+        document.getElementById('grand').textContent = '₹' + gt.toLocaleString('en-IN');
+
+        let parts = ['Flight: ₹' + fa.toLocaleString('en-IN')];
+        if (ca) parts.push('Cab: ₹' + ca.toLocaleString('en-IN'));
+        if (ha) parts.push('Hotel: ₹' + ha.toLocaleString('en-IN'));
+        document.getElementById('breakdown').textContent = parts.join(' + ');
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passenger Details — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="index.html">✈ SkyWings</a>
+        <div><a href="flightsearch.html">← Back to Search</a></div>
+    </nav>
+
+    <div class="page-header">
+        <h1>Passenger Details</h1>
+        <p>Enter details for all passengers</p>
+    </div>
+
+    <div class="container" style="max-width:1000px">
+        <div style="display:grid; grid-template-columns:1fr 340px; gap:2rem">
+            <div>
+                <div id="passengerErrorMsg" class="alert alert-error hidden"></div>
+                <div id="passengerForms"></div>
+                <button onclick="proceedToSeats()" class="btn btn-primary btn-lg btn-full mt-3" id="nextBtn">
+                    Continue to Seat Selection →
+                </button>
+            </div>
+            <div>
+                <div class="summary-sidebar">
+                    <h4 style="margin-bottom:1rem; color:var(--blue)">Flight Summary</h4>
+                    <div class="summary-item"><span class="label">Flight</span><span class="value" id="summFlight"></span></div>
+                    <div class="summary-item"><span class="label">Route</span><span class="value" id="summRoute"></span></div>
+                    <div class="summary-item"><span class="label">Date</span><span class="value" id="summDate"></span></div>
+                    <div class="summary-item"><span class="label">Time</span><span class="value" id="summTime"></span></div>
+                    <div class="summary-item"><span class="label">Class</span><span class="value" id="summClass"></span></div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-item"><span class="label">Base Fare</span><span class="value" id="summPrice"></span></div>
+                    <div class="summary-item"><span class="label">Passengers</span><span class="value" id="summPassengers"></span></div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-total"><span>Subtotal</span><span class="value" id="summTotal"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const flight = JSON.parse(sessionStorage.getItem('selectedFlight') || '{}');
+        if (!flight.flightNumber) window.location.href = 'flightsearch.html';
+
+        // Fill summary sidebar
+        document.getElementById('summFlight').textContent = `${flight.flightNumber} — ${flight.airline}`;
+        document.getElementById('summRoute').textContent = `${flight.from} → ${flight.to}`;
+        document.getElementById('summDate').textContent = new Date(flight.date).toLocaleDateString('en-IN', {
+            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+        });
+        document.getElementById('summTime').textContent = `${flight.departureTime} — ${flight.arrivalTime}`;
+        document.getElementById('summClass').textContent = flight.seatClass.charAt(0).toUpperCase() + flight.seatClass.slice(1);
+        document.getElementById('summPrice').textContent = `₹${Number(flight.price).toLocaleString('en-IN')}`;
+        document.getElementById('summPassengers').textContent = flight.passengers;
+        document.getElementById('summTotal').textContent = `₹${(flight.price * flight.passengers).toLocaleString('en-IN')}`;
+
+        // Generate passenger forms
+        const count = flight.passengers || 1;
+        let html = '';
+        for (let i = 0; i < count; i++) {
+            html += `
+            <div class="card-static passenger-card" style="margin-bottom:1.5rem; padding:1.5rem 2rem">
+                <h4>Passenger ${i + 1}</h4>
+                <div class="form-row mt-2">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" class="form-control pname" placeholder="Enter full name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" class="form-control pemail" placeholder="Email address" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="tel" class="form-control pphone" placeholder="Phone number" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" class="form-control page" placeholder="Age" min="1" max="120" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Gender</label>
+                    <select class="form-control pgender">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>`;
+        }
+        document.getElementById('passengerForms').innerHTML = html;
+
+        function proceedToSeats() {
+            const passengers = [];
+            const names = document.querySelectorAll('.pname');
+            const emails = document.querySelectorAll('.pemail');
+            const phones = document.querySelectorAll('.pphone');
+            const ages = document.querySelectorAll('.page');
+            const genders = document.querySelectorAll('.pgender');
+
+            for (let i = 0; i < count; i++) {
+                if (!names[i].value || !emails[i].value || !phones[i].value || !ages[i].value) {
+                    document.getElementById('passengerErrorMsg').textContent = 'Please fill in all passenger details.';
+                    document.getElementById('passengerErrorMsg').classList.remove('hidden');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                }
+                passengers.push({
+                    name: names[i].value,
+                    email: emails[i].value,
+                    phone: phones[i].value,
+                    age: ages[i].value,
+                    gender: genders[i].value
+                });
+            }
+
+            sessionStorage.setItem('passengers', JSON.stringify(passengers));
+            window.location.href = 'seat.html';
+        }
+    </script>
+
+</body>
+</html>

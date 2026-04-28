@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="index.html">✈ SkyWings</a>
+        <div>
+            <a href="register.html">Create Account</a>
+        </div>
+    </nav>
+
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="card">
+                <h2>Login</h2>
+                <div id="errorMsg" class="alert alert-error hidden"></div>
+
+                <form id="loginForm" onsubmit="return handleLogin(event)" autocomplete="off">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="loginUser" class="form-control" placeholder="Enter your username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="loginPass" class="form-control" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn">Sign In</button>
+                </form>
+
+                <div class="auth-footer">
+                    Don't have an account? <a href="register.html">Register here</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('loginUser').value;
+            const password = document.getElementById('loginPass').value;
+            const btn = document.getElementById('loginBtn');
+            const errorMsg = document.getElementById('errorMsg');
+
+            btn.textContent = 'Signing in...';
+            btn.disabled = true;
+            errorMsg.classList.add('hidden');
+
+            fetch('LoginServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    sessionStorage.setItem('user', JSON.stringify({ id: data.userId, username: data.username }));
+                    window.location.href = 'flightsearch.html';
+                } else {
+                    errorMsg.textContent = data.message || 'Invalid username or password';
+                    errorMsg.classList.remove('hidden');
+                    btn.textContent = 'Sign In';
+                    btn.disabled = false;
+                }
+            })
+            .catch(() => {
+                errorMsg.textContent = 'Connection error. Please try again.';
+                errorMsg.classList.remove('hidden');
+                btn.textContent = 'Sign In';
+                btn.disabled = false;
+            });
+
+            return false;
+        }
+    </script>
+
+</body>
+</html>

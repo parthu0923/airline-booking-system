@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Your Seats — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .seat-info-bar {
+            display: flex; gap: 1.5rem; justify-content: center; padding: .8rem;
+            background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+            margin-bottom: 1.2rem; flex-wrap: wrap; box-shadow: var(--shadow);
+        }
+        .seat-info-item { text-align: center; }
+        .seat-info-item .label { font-size: .72rem; color: var(--muted); text-transform: uppercase; }
+        .seat-info-item .val { font-weight: 700; font-size: 1rem; }
+        .class-toggle-bar {
+            display: flex; justify-content: center; margin-bottom: 1.2rem;
+            background: #f1f5f9; border-radius: var(--radius); padding: 4px; border: 1px solid var(--border);
+        }
+        .class-toggle-btn {
+            flex: 1; max-width: 200px; padding: .6rem 1.2rem; text-align: center;
+            border: none; background: transparent; cursor: pointer; font-weight: 600;
+            font-size: .9rem; color: var(--muted); border-radius: 8px; transition: all .3s;
+        }
+        .class-toggle-btn.active {
+            background: #fff; color: var(--blue); box-shadow: 0 2px 8px rgba(0,0,0,.1);
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="index.html">✈ SkyWings</a>
+        <div><a href="passenger.html">← Back</a></div>
+    </nav>
+
+    <div class="page-header">
+        <h1>Select Your Seats</h1>
+        <p id="seatSubtitle">Choose seats for your flight</p>
+    </div>
+
+    <div class="container" style="max-width:1000px">
+        <div class="class-toggle-bar">
+            <button class="class-toggle-btn" id="toggleEconomy" onclick="switchClass('economy')">Economy Class</button>
+            <button class="class-toggle-btn" id="toggleBusiness" onclick="switchClass('business')">Business Class</button>
+        </div>
+        <div class="seat-info-bar">
+            <div class="seat-info-item"><div class="label">Flight</div><div class="val" id="infoFlight"></div></div>
+            <div class="seat-info-item"><div class="label">Route</div><div class="val" id="infoRoute"></div></div>
+            <div class="seat-info-item"><div class="label">Date</div><div class="val" id="infoDate"></div></div>
+            <div class="seat-info-item"><div class="label">Class</div><div class="val" id="infoClass" style="color:var(--accent)"></div></div>
+            <div class="seat-info-item"><div class="label">Passengers</div><div class="val" id="infoPassengers"></div></div>
+            <div class="seat-info-item"><div class="label">Selected</div><div class="val" id="infoSelected" style="color:var(--green)">0</div></div>
+        </div>
+    </div>
+
+    <div class="seat-page-layout">
+        <div class="aircraft-container">
+            <div class="aircraft-nose">COCKPIT</div>
+            <div class="aircraft-body" id="aircraftBody">
+                <div class="seat-col-headers" id="colHeaders"></div>
+                <div id="seatMap"></div>
+            </div>
+            <div class="seat-legend">
+                <div class="legend-item"><div class="legend-box" style="background:#dbeafe;border:2px solid #93c5fd"></div><span>Available</span></div>
+                <div class="legend-item"><div class="legend-box" style="background:#bbf7d0;border:2px solid var(--green)"></div><span>Selected</span></div>
+                <div class="legend-item"><div class="legend-box" style="background:#f1f5f9;border:2px solid #e2e8f0;opacity:.5"></div><span>Booked</span></div>
+            </div>
+        </div>
+        <div>
+            <div class="summary-sidebar">
+                <h4 style="margin-bottom:.8rem; color:var(--blue)">Selected Seats</h4>
+                <div id="selectedSeatsList">
+                    <p style="color:var(--muted); font-size:.85rem">Click on seats to select them</p>
+                </div>
+                <div class="summary-divider"></div>
+                <div class="price-breakdown" id="priceBreakdown">
+                    <div class="price-breakdown-item">
+                        <span class="label">Base Fare</span>
+                        <span id="baseFareDisplay">₹0</span>
+                    </div>
+                    <div class="price-breakdown-item total">
+                        <span>Total</span>
+                        <span class="value" id="totalDisplay">₹0</span>
+                    </div>
+                </div>
+                <button onclick="proceedToPayment()" class="btn btn-primary btn-full btn-lg" id="payBtn" disabled>
+                    Continue to Payment →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const flight = JSON.parse(sessionStorage.getItem('selectedFlight') || '{}');
+        const passengerList = JSON.parse(sessionStorage.getItem('passengers') || '[]');
+        const passengerCount = passengerList.length || 1;
+
+        if (!flight.flightNumber) window.location.href = 'flightsearch.html';
+
+        let currentClass = flight.seatClass || 'economy';
+        let selectedSeats = [];
+        let bookedSeats = [];
+        const businessRows = 5;
+        const economyRows = 25;
+
+        // Set info bar
+        document.getElementById('infoFlight').textContent = flight.flightNumber;
+        document.getElementById('infoRoute').textContent = `${flight.from} → ${flight.to}`;
+        document.getElementById('infoDate').textContent = new Date(flight.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        document.getElementById('infoPassengers').textContent = passengerCount;
+        document.getElementById('seatSubtitle').textContent = `Select ${passengerCount} seat${passengerCount > 1 ? 's' : ''} for ${flight.flightNumber}`;
+
+        function isBusiness() {
+            return currentClass === 'business';
+        }
+
+        function updateClassToggleUI() {
+            document.getElementById('toggleEconomy').classList.toggle('active', currentClass === 'economy');
+            document.getElementById('toggleBusiness').classList.toggle('active', currentClass === 'business');
+            document.getElementById('infoClass').textContent = currentClass.charAt(0).toUpperCase() + currentClass.slice(1);
+        }
+
+        function switchClass(c) {
+            if (c === currentClass) return;
+            currentClass = c;
+            flight.seatClass = c;
+            selectedSeats = [];
+            updateClassToggleUI();
+            recalculatePrice();
+            loadBookedSeats();
+        }
+
+        function recalculatePrice() {
+            fetch(`FlightServlet?from=${encodeURIComponent(flight.from)}&to=${encodeURIComponent(flight.to)}&date=${flight.date}&seatClass=${currentClass}`)
+            .then(r => r.json())
+            .then(data => {
+                const flights = data.flights || [];
+                const match = flights.find(f => f.id === flight.flightId);
+                if (match) {
+                    flight.price = match.price;
+                    sessionStorage.setItem('selectedFlight', JSON.stringify(flight));
+                }
+                updateSummary();
+            })
+            .catch(() => updateSummary());
+        }
+
+        updateClassToggleUI();
+
+        function loadBookedSeats() {
+            fetch(`SeatServlet?flightId=${flight.flightId}&date=${flight.date}`)
+            .then(r => r.json())
+            .then(data => {
+                bookedSeats = data.bookedSeats || [];
+                renderSeatMap();
+            })
+            .catch(() => renderSeatMap());
+        }
+
+        function renderColHeaders() {
+            const h = document.getElementById('colHeaders');
+            let html = '<div class="row-number"></div>';
+            if (isBusiness()) {
+                html += '<div class="seat-col-header">A</div><div class="seat-col-header">B</div>';
+                html += '<div class="seat-aisle"></div>';
+                html += '<div class="seat-col-header">C</div><div class="seat-col-header">D</div>';
+            } else {
+                html += '<div class="seat-col-header">A</div><div class="seat-col-header">B</div><div class="seat-col-header">C</div>';
+                html += '<div class="seat-aisle"></div>';
+                html += '<div class="seat-col-header">D</div><div class="seat-col-header">E</div><div class="seat-col-header">F</div>';
+            }
+            html += '<div class="row-number"></div>';
+            h.innerHTML = html;
+        }
+
+        function renderSeatMap() {
+            renderColHeaders();
+            const map = document.getElementById('seatMap');
+            let html = '';
+            const totalRows = isBusiness() ? businessRows : (businessRows + economyRows);
+            const cols = isBusiness() ? ['A', 'B', 'C', 'D'] : ['A', 'B', 'C', 'D', 'E', 'F'];
+
+            html += '<div class="seat-class-label">Business Class</div>';
+
+            for (let r = 1; r <= totalRows; r++) {
+                if (r === businessRows + 1) {
+                    html += '<div class="seat-class-label">Economy Class</div>';
+                }
+
+                html += '<div class="seat-row">';
+                html += `<div class="row-number">${r}</div>`;
+
+                const rowCols = r <= businessRows ? ['A', 'B', 'C', 'D'] : cols;
+
+                for (let ci = 0; ci < rowCols.length; ci++) {
+                    // Add aisle
+                    if (rowCols.length === 4 && ci === 2) html += '<div class="seat-aisle">|</div>';
+                    else if (rowCols.length === 6 && ci === 3) html += '<div class="seat-aisle">|</div>';
+
+                    const col = rowCols[ci];
+                    const sid = `${r}${col}`;
+                    const isBooked = bookedSeats.includes(sid);
+                    const isBR = r <= businessRows;
+
+                    let cls = 'seat-available';
+                    let clickable = true;
+
+                    if (isBooked) {
+                        cls = 'seat-booked';
+                        clickable = false;
+                    } else if (!isBusiness() && isBR) {
+                        cls = 'seat-booked';
+                        clickable = false;
+                    } else if (isBusiness() && !isBR) {
+                        cls = 'seat-booked';
+                        clickable = false;
+                    }
+
+                    if (selectedSeats.includes(sid)) {
+                        cls = 'seat-selected';
+                    }
+
+                    html += `<div class="seat ${cls}" id="seat-${sid}" data-seat="${sid}" ${clickable ? `onclick="toggleSeat('${sid}')"` : ''}>${sid}</div>`;
+                }
+
+                html += `<div class="row-number">${r}</div></div>`;
+            }
+
+            map.innerHTML = html;
+        }
+
+        function toggleSeat(sid) {
+            const el = document.getElementById(`seat-${sid}`);
+            if (el.classList.contains('seat-booked')) return;
+
+            if (selectedSeats.includes(sid)) {
+                selectedSeats = selectedSeats.filter(s => s !== sid);
+                el.classList.remove('seat-selected');
+            } else {
+                if (selectedSeats.length >= passengerCount) {
+                    showToast(`You can only select ${passengerCount} seat${passengerCount > 1 ? 's' : ''}.`);
+                    return;
+                }
+                selectedSeats.push(sid);
+                el.classList.add('seat-selected');
+            }
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const listDiv = document.getElementById('selectedSeatsList');
+            const baseFare = flight.price * passengerCount;
+
+            if (!selectedSeats.length) {
+                listDiv.innerHTML = '<p style="color:var(--muted); font-size:.85rem">Click on seats to select them</p>';
+            } else {
+                let h = '';
+                selectedSeats.forEach((sid, i) => {
+                    const name = passengerList[i] ? passengerList[i].name : `Passenger ${i + 1}`;
+                    h += `<div style="display:flex; justify-content:space-between; align-items:center; padding:.4rem 0; border-bottom:1px solid var(--border)">
+                        <div>
+                            <div style="font-weight:600">Seat ${sid}</div>
+                            <div style="font-size:.8rem; color:var(--muted)">${name}</div>
+                        </div>
+                        <div style="color:var(--green); font-weight:600">✓</div>
+                    </div>`;
+                });
+                listDiv.innerHTML = h;
+            }
+
+            document.getElementById('infoSelected').textContent = selectedSeats.length;
+            document.getElementById('baseFareDisplay').textContent = `₹${baseFare.toLocaleString('en-IN')}`;
+            document.getElementById('totalDisplay').textContent = `₹${baseFare.toLocaleString('en-IN')}`;
+
+            const btn = document.getElementById('payBtn');
+            btn.disabled = selectedSeats.length !== passengerCount;
+            btn.textContent = selectedSeats.length === passengerCount
+                ? 'Continue to Payment →'
+                : `Select ${passengerCount - selectedSeats.length} more seat${passengerCount - selectedSeats.length !== 1 ? 's' : ''}`;
+        }
+
+        function proceedToPayment() {
+            if (selectedSeats.length !== passengerCount) return;
+
+            const bd = JSON.parse(sessionStorage.getItem('selectedFlight'));
+            bd.seatClass = currentClass;
+            bd.selectedSeats = selectedSeats;
+            bd.seatCharges = 0;
+            bd.totalAmount = bd.price * passengerCount;
+            sessionStorage.setItem('selectedFlight', JSON.stringify(bd));
+
+            const updatedPassengers = passengerList.map((p, i) => ({
+                ...p,
+                seatNumber: selectedSeats[i]
+            }));
+            sessionStorage.setItem('passengers', JSON.stringify(updatedPassengers));
+
+            window.location.href = 'payment.html';
+        }
+
+        function showToast(msg) {
+            let t = document.getElementById('seatToast');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'seatToast';
+                t.style.cssText = 'position:fixed;top:16px;right:16px;padding:.7rem 1.2rem;border-radius:8px;background:#fff;border:1px solid var(--border);border-left:3px solid var(--red);z-index:1000;font-size:.9rem;box-shadow:0 4px 12px rgba(0,0,0,.1);transition:opacity .3s';
+                document.body.appendChild(t);
+            }
+            t.textContent = msg;
+            t.style.opacity = '1';
+            setTimeout(() => { t.style.opacity = '0'; }, 2500);
+        }
+
+        loadBookedSeats();
+        updateSummary();
+    </script>
+
+</body>
+</html>

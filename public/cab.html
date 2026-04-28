@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book a Cab — SkyWings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="index.html">✈ SkyWings</a>
+        <div><a href="ticket.html">← Back to Ticket</a></div>
+    </nav>
+
+    <div class="page-header">
+        <h1>Book a Cab</h1>
+        <p>Get a ride from the airport to your destination</p>
+    </div>
+
+    <div class="container-md">
+        <div class="card-static">
+            <div id="successMsg" class="alert alert-success hidden"></div>
+            <div id="errorMsg" class="alert alert-error hidden"></div>
+
+            <div id="cabForm">
+                <div class="form-group">
+                    <label>Pickup Location (Airport)</label>
+                    <input type="text" id="pickup" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Drop Location</label>
+                    <input type="text" id="drop" class="form-control" placeholder="Where are you going?" required>
+                </div>
+                <div class="form-group">
+                    <label>Date of Booking</label>
+                    <input type="date" id="bookingDate" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Select Cab Type</label>
+                </div>
+                <div class="cab-type-selector">
+                    <div class="cab-type-option selected" onclick="selectCab(this, 'Mini', 300)" id="cab-mini">
+                        <div style="font-size:1.1rem; font-weight:700; margin-bottom:.3rem">Mini</div>
+                        <div class="cab-price">₹300</div>
+                    </div>
+                    <div class="cab-type-option" onclick="selectCab(this, 'SUV', 800)" id="cab-suv">
+                        <div style="font-size:1.1rem; font-weight:700; margin-bottom:.3rem">SUV</div>
+                        <div class="cab-price">₹800</div>
+                    </div>
+                </div>
+
+                <div class="form-group mt-3">
+                    <div class="toggle-switch">
+                        <div class="toggle" id="poolToggle" onclick="togglePool()"></div>
+                        <div>
+                            <div style="font-weight:600">Enable Pooling</div>
+                            <div style="font-size:.8rem; color:var(--muted)">Share ride & save 30%</div>
+                        </div>
+                        <div id="poolDiscount" style="color:var(--green); font-weight:700" class="hidden">-30% OFF!</div>
+                    </div>
+                </div>
+
+                <div id="poolingInfo" class="hidden" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:.8rem 1rem; margin-bottom:1rem">
+                    <div style="font-weight:600; color:#166534; margin-bottom:.4rem">Active Pooling Rides</div>
+                    <div id="poolingCount" style="font-size:.9rem; color:#15803d"></div>
+                    <div id="poolingList" style="margin-top:.5rem; font-size:.85rem; color:var(--text2)"></div>
+                </div>
+
+                <div class="summary-divider" style="margin:1.5rem 0"></div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem">
+                    <span style="font-size:1.2rem; font-weight:600">Total</span>
+                    <span style="font-size:1.8rem; font-weight:800; color:var(--accent)" id="cabTotal">₹300</span>
+                </div>
+
+                <button onclick="bookCab()" class="btn btn-accent btn-full btn-lg" id="bookCabBtn">Book Cab</button>
+            </div>
+
+            <div id="afterBooking" class="hidden" style="margin-top:1.5rem">
+                <div class="summary-divider" style="margin:1rem 0"></div>
+                <p style="text-align:center; color:var(--text2); margin-bottom:1rem">What would you like to do next?</p>
+                <div style="display:flex; gap:.8rem; justify-content:center">
+                    <a href="hotel.html" class="btn btn-success btn-lg" id="hotelBtn">Book Hotel</a>
+                    <a href="extras-payment.html" class="btn btn-primary btn-lg">Proceed to Payment</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const booking = JSON.parse(sessionStorage.getItem('bookingResult') || '{}');
+        const existingHotel = sessionStorage.getItem('hotelBooking');
+
+        let selectedCabType = 'Mini';
+        let cabPrice = 300;
+        let isPooling = false;
+
+        if (booking.to) {
+            document.getElementById('pickup').value = `${booking.to} Airport`;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('bookingDate').min = today;
+        document.getElementById('bookingDate').value = booking.date || today;
+
+        function selectCab(el, type, price) {
+            document.querySelectorAll('.cab-type-option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedCabType = type;
+            cabPrice = price;
+            updateTotal();
+        }
+
+        function togglePool() {
+            const toggle = document.getElementById('poolToggle');
+            const discount = document.getElementById('poolDiscount');
+            isPooling = !isPooling;
+            toggle.classList.toggle('active');
+            discount.classList.toggle('hidden');
+
+            if (isPooling) {
+                loadPoolingInfo();
+            } else {
+                document.getElementById('poolingInfo').classList.add('hidden');
+            }
+            updateTotal();
+        }
+
+        function loadPoolingInfo() {
+            fetch('CabServlet')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('poolingInfo').classList.remove('hidden');
+                const count = data.poolingCount || 0;
+                document.getElementById('poolingCount').textContent =
+                    count > 0 ? `${count} traveler${count > 1 ? 's' : ''} currently sharing rides` : 'Be the first to start a pooling ride!';
+
+                if (data.poolingDetails && data.poolingDetails.length > 0) {
+                    let html = '';
+                    data.poolingDetails.forEach(p => {
+                        html += `<div style="padding:.2rem 0; border-bottom:1px solid #dcfce7">${p.pickup} → ${p.drop} (${p.cabType})</div>`;
+                    });
+                    document.getElementById('poolingList').innerHTML = html;
+                } else {
+                    document.getElementById('poolingList').innerHTML = '';
+                }
+            })
+            .catch(() => {
+                document.getElementById('poolingInfo').classList.remove('hidden');
+                document.getElementById('poolingCount').textContent = 'Pooling available - share and save!';
+            });
+        }
+
+        function updateTotal() {
+            let total = cabPrice;
+            if (isPooling) total = Math.round(total * 0.7);
+            document.getElementById('cabTotal').textContent = `₹${total.toLocaleString('en-IN')}`;
+        }
+
+        function bookCab() {
+            const drop = document.getElementById('drop').value;
+            const bookingDate = document.getElementById('bookingDate').value;
+
+            if (!drop) {
+                document.getElementById('errorMsg').textContent = 'Please enter your drop location.';
+                document.getElementById('errorMsg').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('errorMsg').classList.add('hidden');
+            const btn = document.getElementById('bookCabBtn');
+            btn.textContent = 'Booking...';
+            btn.disabled = true;
+
+            let total = cabPrice;
+            if (isPooling) total = Math.round(total * 0.7);
+
+            sessionStorage.setItem('cabBooking', JSON.stringify({
+                pickup: document.getElementById('pickup').value,
+                drop: drop,
+                cabType: selectedCabType,
+                isPooling: isPooling,
+                bookingDate: bookingDate,
+                amount: total
+            }));
+
+            fetch('CabServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    bookingId: booking.bookingId || 0,
+                    pickup: document.getElementById('pickup').value,
+                    drop: drop,
+                    cabType: selectedCabType,
+                    isPooling: isPooling ? '1' : '0',
+                    bookingDate: bookingDate,
+                    amount: total
+                }).toString()
+            })
+            .then(() => showSuccess())
+            .catch(() => showSuccess());
+        }
+
+        function showSuccess() {
+            document.getElementById('successMsg').textContent = `Cab booked successfully! Your ${selectedCabType} cab will be ready at the airport.`;
+            document.getElementById('successMsg').classList.remove('hidden');
+
+            const btn = document.getElementById('bookCabBtn');
+            btn.textContent = 'Cab Booked!';
+            btn.style.background = 'var(--green)';
+
+            document.getElementById('afterBooking').classList.remove('hidden');
+
+            if (existingHotel) {
+                const hotelBtn = document.getElementById('hotelBtn');
+                hotelBtn.textContent = 'Hotel Already Booked';
+                hotelBtn.style.opacity = '0.6';
+                hotelBtn.style.pointerEvents = 'none';
+            }
+        }
+    </script>
+
+</body>
+</html>
